@@ -6,6 +6,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import bg from '../../assets/pink_bg.jpg';
 
 const LoginPage: React.FC = () => {
+  const [isSignup, setIsSignup] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -37,13 +38,52 @@ const LoginPage: React.FC = () => {
       style={{ backgroundImage: `url(${bg})` }}
     >
         <div className="relative w-full bg-white max-w-4xl rounded-[20px] shadow-md overflow-hidden min-h-[550px] flex items-center justify-end">
-          
-          <div className="w-1/2 flex flex-col items-center justify-center p-12">
-            <img src={logo} alt="Edelweiss Logo" className="mb-4 w-32 h-32 object-contain" />
-            <img src={text_logo} alt="Edelweiss Text Logo" className="mb-8 w-48 h-auto object-contain" />
+          {/* Logo container that slides between right and left using transform */}
+          <div
+            className={`absolute top-0 bottom-0 w-1/2 flex flex-col items-center justify-center p-12 transition-transform duration-700 ease-in-out z-20`}
+            style={{ right: 0, transform: isSignup ? 'translateX(-100%)' : 'translateX(0)' }}
+          >
+            <img
+              src={logo}
+              alt="Edelweiss Logo"
+              className={`mb-4 w-32 h-32 object-contain transition-all duration-700`}
+            />
+            <img
+              src={text_logo}
+              alt="Edelweiss Text Logo"
+              className={`mb-8 w-48 h-auto object-contain transition-transform duration-700`}
+            />
           </div>
 
-          <div className="absolute left-0 top-0 bottom-0 w-1/2 items-center bg-white shadow-xl flex flex-col justify-center p-12 rounded-r-[20px]">
+          {/* Signup form that fades in on the right when toggled */}
+          <div
+            className={`absolute top-0 bottom-0 w-1/2 flex flex-col justify-center p-12 transition-opacity duration-700`}
+            style={{ right: 0, opacity: isSignup ? 1 : 0, pointerEvents: isSignup ? 'auto' : 'none' }}
+          >
+            <h1 className="text-3xl font-bold text-pink-600">Create an account</h1>
+            <p className="mt-2 text-gray-600">Sign up to start using Edelweiss</p>
+            <form className="mt-6 w-full">
+              <div className="mb-3">
+                <label className="block text-gray-700 mb-1">Full name</label>
+                <input className="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Your name" />
+              </div>
+              <div className="mb-3">
+                <label className="block text-gray-700 mb-1">Email</label>
+                <input className="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Email" />
+              </div>
+              <div className="mb-3">
+                <label className="block text-gray-700 mb-1">Password</label>
+                <input type="password" className="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Password" />
+              </div>
+              <button className="mt-3 w-full bg-pink-600 text-white py-2 rounded-lg hover:bg-pink-700 transition">Sign Up</button>
+              <div className="mt-3 text-sm text-gray-600 text-center">Already have an account? <button type="button" onClick={() => setIsSignup(false)} className="text-pink-600 underline">Log in</button></div>
+            </form>
+          </div>
+
+          <div
+            className={`absolute left-0 top-0 bottom-0 w-1/2 items-center bg-white shadow-xl flex flex-col justify-center p-12 rounded-r-[20px] transition-opacity duration-700`}
+            style={{ opacity: isSignup ? 0 : 1, pointerEvents: isSignup ? 'none' : 'auto' }}
+          >
              <h1 className="text-4xl font-bold text-pink-600">Welcome Back!</h1>
              <p className="mt-4 text-gray-600">Log in to your Edelweiss account</p>
              
@@ -97,7 +137,7 @@ const LoginPage: React.FC = () => {
                 </button>
              </form>
 
-             <p className="mt-4 text-gray-600">Don't have an account? <a href="#" className="text-pink-600 underline">Sign up</a></p>
+             <p className="mt-4 text-gray-600">Don't have an account? <button type="button" onClick={() => setIsSignup(true)} className="text-pink-600 underline">Sign up</button></p>
           </div>
         </div>
     </div>
