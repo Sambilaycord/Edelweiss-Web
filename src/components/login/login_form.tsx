@@ -32,6 +32,25 @@ const LoginPage: React.FC = () => {
     }
   };
 
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    try {
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+      });
+
+      if (signUpError) throw signUpError;
+
+      console.log('Signup successful:', data);
+      // Redirect here (e.g., navigate('/dashboard'))
+    } catch (err: any) {
+      setError(err.message || 'Signup failed');
+    }
+  };
+
   return (
     <div 
       className="min-h-screen flex items-center justify-center p-4 font-sans bg-cover bg-center bg-no-repeat"
@@ -57,11 +76,11 @@ const LoginPage: React.FC = () => {
 
           {/* Signup form that fades in on the right when toggled */}
           <div
-            className={`absolute top-0 bottom-0 w-1/2 flex flex-col justify-center p-12 transition-opacity duration-700`}
+            className={`absolute top-0 bottom-0 w-1/2 rounded-l-[20px] shadow-xl flex flex-col justify-center p-12 transition-opacity duration-700`}
             style={{ right: 0, opacity: isSignup ? 1 : 0, pointerEvents: isSignup ? 'auto' : 'none' }}
           >
-            <h1 className="text-3xl font-bold text-pink-600">Create an account</h1>
-            <p className="mt-2 text-gray-600">Sign up to start using Edelweiss</p>
+            <h1 className="text-4xl font-bold text-pink-600 text-center">Create an account</h1>
+            <p className="mt-2 text-gray-600 text-center">Sign up to start using Edelweiss</p>
             <form className="mt-6 w-full">
               <div className="mb-3">
                 <label className="block text-gray-700 mb-1">Full name</label>
