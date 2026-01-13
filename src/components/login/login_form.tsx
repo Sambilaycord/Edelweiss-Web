@@ -9,6 +9,8 @@ const LoginPage: React.FC = () => {
   const [isSignup, setIsSignup] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [loading, setloading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
@@ -35,19 +37,25 @@ const LoginPage: React.FC = () => {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setloading(true);
 
     try {
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: email,
         password: password,
+        options: {
+          data: { 
+            username: username,
+          }
+        }
       });
 
       if (signUpError) throw signUpError;
-
-      console.log('Signup successful:', data);
-      // Redirect here (e.g., navigate('/dashboard'))
+      alert('Signup successful! Check your email for a confirmation link.');
     } catch (err: any) {
       setError(err.message || 'Signup failed');
+    } finally {
+      setloading(false);
     }
   };
 
@@ -57,7 +65,6 @@ const LoginPage: React.FC = () => {
       style={{ backgroundImage: `url(${bg})` }}
     >
         <div className="relative w-full bg-white max-w-4xl rounded-[20px] shadow-md overflow-hidden min-h-[550px] flex items-center justify-end">
-          {/* Logo container that slides between right and left using transform */}
           <div
             className={`absolute top-0 bottom-0 w-1/2 flex flex-col items-center justify-center p-12 transition-transform duration-700 ease-in-out z-20`}
             style={{ right: 0, transform: isSignup ? 'translateX(-100%)' : 'translateX(0)' }}
@@ -74,28 +81,61 @@ const LoginPage: React.FC = () => {
             />
           </div>
 
-          {/* Signup form that fades in on the right when toggled */}
           <div
             className={`absolute top-0 bottom-0 w-1/2 rounded-l-[20px] shadow-xl flex flex-col justify-center p-12 transition-opacity duration-700`}
             style={{ right: 0, opacity: isSignup ? 1 : 0, pointerEvents: isSignup ? 'auto' : 'none' }}
           >
             <h1 className="text-4xl font-bold text-pink-600 text-center">Create an account</h1>
             <p className="mt-2 text-gray-600 text-center">Sign up to start using Edelweiss</p>
-            <form className="mt-6 w-full">
+            <form className="mt-6 w-full" onSubmit={handleSignup}>
+              {error && (
+                  <div className="mb-4 p-2 text-sm text-red-600 bg-red-100 rounded border border-red-200">
+                    {error}
+                  </div>
+                )}
+
               <div className="mb-3">
-                <label className="block text-gray-700 mb-1">Full name</label>
-                <input className="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Your name" />
+                <label className="block text-gray-700 mb-1">Username</label>
+                <input
+                  type="text"
+                  id="username"
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg" 
+                  placeholder="Your name"
+                />
               </div>
+              
               <div className="mb-3">
                 <label className="block text-gray-700 mb-1">Email</label>
-                <input className="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Email" />
+                <input 
+                type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg" 
+                  placeholder="Email" 
+                  required
+                />
               </div>
+              
               <div className="mb-3">
                 <label className="block text-gray-700 mb-1">Password</label>
-                <input type="password" className="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Password" />
+                <input
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  type="password" 
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg" 
+                  placeholder="Password" 
+                />
               </div>
-              <button className="mt-3 w-full bg-pink-600 text-white py-2 rounded-lg hover:bg-pink-700 transition">Sign Up</button>
-              <div className="mt-3 text-sm text-gray-600 text-center">Already have an account? <button type="button" onClick={() => setIsSignup(false)} className="text-pink-600 underline">Log in</button></div>
+              
+              <button
+                type="submit" 
+                className="mt-3 w-full bg-pink-600 text-white py-2 rounded-lg hover:bg-pink-700 cursor-pointer transition">
+                Sign Up
+              </button>
+              <div className="mt-3 text-sm text-gray-600 text-center">Already have an account? <button type="button" onClick={() => setIsSignup(false)} className="text-pink-600 underline cursor-pointer">Log in</button></div>
             </form>
           </div>
 
@@ -141,7 +181,7 @@ const LoginPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none cursor-pointer"
                     >
                       {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
@@ -150,13 +190,13 @@ const LoginPage: React.FC = () => {
 
                 <button 
                   type="submit" 
-                  className="mt-4 w-full bg-pink-600 text-white py-2 rounded-lg hover:bg-pink-700 transition duration-300"
+                  className="mt-4 w-full bg-pink-600 text-white py-2 rounded-lg hover:bg-pink-700 cursor-pointer transition duration-300"
                 >
                   Log In
                 </button>
              </form>
 
-             <p className="mt-4 text-gray-600">Don't have an account? <button type="button" onClick={() => setIsSignup(true)} className="text-pink-600 underline">Sign up</button></p>
+             <p className="mt-4 text-gray-600">Don't have an account? <button type="button" onClick={() => setIsSignup(true)} className="text-pink-600 underline cursor-pointer">Sign up</button></p>
           </div>
         </div>
     </div>
