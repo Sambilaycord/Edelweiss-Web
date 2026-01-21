@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import logo from '../../assets/logo.png';
 import text_logo from '../../assets/edelweiss.png';
+import mail_receive from '../../assets/mail_receive.png';
 import { Eye, EyeOff } from 'lucide-react';
 import bg from '../../assets/pink_bg.jpg';
 
@@ -13,6 +14,9 @@ const LoginPage: React.FC = () => {
   const [loading, setloading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [signupSuccess, setSuccess] = useState('');
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,11 +55,31 @@ const LoginPage: React.FC = () => {
       });
 
       if (signUpError) throw signUpError;
-      alert('Signup successful! Check your email for a confirmation link.');
+      setSuccess('Check your email for a confirmation link.');
     } catch (err: any) {
       setError(err.message || 'Signup failed');
     } finally {
       setloading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setResendMessage('');
+    setResendLoading(true);
+    try {
+      const anyAuth = (supabase.auth as any);
+      if (anyAuth && typeof anyAuth.resend === 'function') {
+        await anyAuth.resend({ email, type: 'signup' });
+      } else {
+        // fallback: send a magic link/otp which will reach the user's email
+        const { error } = await supabase.auth.signInWithOtp({ email });
+        if (error) throw error;
+      }
+      setResendMessage('Verification email resent. Check your inbox.');
+    } catch (err: any) {
+      setResendMessage(err.message || 'Failed to resend verification email');
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -64,6 +88,43 @@ const LoginPage: React.FC = () => {
       className="min-h-screen flex items-center justify-center p-4 font-sans bg-cover bg-center bg-no-repeat"
       style={{ backgroundImage: `url(${bg})` }}
     >
+      {signupSuccess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black opacity-40" />
+          <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4 h-[50vh] overflow-auto flex flex-col">
+            <button
+              aria-label="Close"
+              className="absolute top-2 right-3 text-pink-600 hover:text-pink-700 text-5xl leading-none cursor-pointer"
+              onClick={() => {
+                setSuccess('');
+                setIsSignup(false);
+                setResendMessage('');
+              }}
+            >
+              ×
+            </button>
+            <img
+              src={mail_receive}
+              alt="Mail Receive"
+              className={`w-120 h-50 my-4 object-contain mx-auto`}
+            />
+            <h1 className="text-4xl text-center font-semibold text-pink-600 mb-4">Success!</h1>
+            <p className="text-base text-center text-black ">{signupSuccess}</p>
+            {resendMessage && (
+              <p className="text-sm text-gray-600 mb-3">{resendMessage}</p>
+            )}
+            <div className="mt-auto flex justify-center items-center py-4">
+              <button
+                className="px-4 py-2 bg-pink-600 text-white rounded hover:bg-pink-700 disabled:opacity-60 cursor-pointer"
+                onClick={handleResendVerification}
+                disabled={resendLoading}
+              >
+                {resendLoading ? 'Sending...' : 'Resend Verification Email'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
         <div className="relative w-full bg-white max-w-4xl rounded-[20px] shadow-md overflow-hidden min-h-[550px] flex items-center justify-end">
           <div
             className={`absolute top-0 bottom-0 w-1/2 flex flex-col items-center justify-center p-12 transition-transform duration-700 ease-in-out z-20`}
