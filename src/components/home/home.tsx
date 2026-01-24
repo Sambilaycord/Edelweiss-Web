@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState} from 'react';
 import logo from '../../assets/logo.png';
 import text_logo from '../../assets/edelweiss.png';
-import { ShoppingCart, User, Bell, Search, ArrowRight, Star, Heart } from 'lucide-react';
+import { ShoppingCart, User, Bell, Search} from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import HeroCarousel from './hero_carousel';
 
 type Product = {
 	id: number;
@@ -102,21 +103,7 @@ const HomePage: React.FC = () => {
 			</header>
 
 			<main className="max-w-6xl mx-auto pt-6">
-				<section className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center bg-white rounded-2xl shadow p-8 mb-8">
-					<div>
-						<h1 className="text-4xl font-bold text-pink-600 mb-4">Beautiful everyday goods</h1>
-						<p className="text-gray-700 mb-6">Shop a small curated collection of lifestyle and home items crafted for calm, cozy living.</p>
-						<div className="flex gap-3">
-							<a href="#products" className="px-5 py-3 bg-pink-600 text-white rounded-lg shadow hover:bg-pink-700">Start shopping</a>
-							<a href="#" className="px-5 py-3 border border-pink-600 text-pink-600 rounded-lg hover:bg-pink-50">Learn more</a>
-						</div>
-					</div>
-					<div className="flex items-center justify-center">
-						<div className="w-56 h-56 bg-pink-50 rounded-lg flex items-center justify-center border border-pink-100">
-							<span className="text-pink-300">Hero Image</span>
-						</div>
-					</div>
-				</section>
+				<HeroCarousel />
 
 				<section id="products">
 					<h2 className="text-2xl font-semibold mb-4">Featured products</h2>
