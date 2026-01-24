@@ -1,10 +1,39 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Timer, ShoppingCart } from 'lucide-react';
 
 const FlashSale = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Mock Data: 12 products (Added more to demonstrate the 5-item scrolling better)
+  // 1. TIMER STATE: Start with 4 hours, 23 mins, 11 seconds (in total seconds)
+  // 4h * 3600 + 23m * 60 + 11s = 15791 seconds
+  const [timeLeft, setTimeLeft] = useState(15791);
+
+  // 2. TIMER LOGIC: Decrement every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 0) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(timer);
+  }, []);
+
+  // 3. FORMATTER: Convert seconds to HH:MM:SS
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    // padStart(2, '0') ensures "9" becomes "09"
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // Mock Data
   const products = [
     { id: 1, name: "Velvet Cushion", price: 24.99, oldPrice: 49.99, discount: "-50%", image: "bg-red-100" },
     { id: 2, name: "Ceramic Vase", price: 18.50, oldPrice: 28.00, discount: "-35%", image: "bg-orange-100" },
@@ -22,9 +51,6 @@ const FlashSale = () => {
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
       const { current } = scrollContainerRef;
-      
-      // Calculate the width of the visible container
-      // This ensures we scroll exactly one "screen" worth of content (5 items)
       const scrollAmount = current.clientWidth; 
 
       if (direction === 'left') {
@@ -42,9 +68,10 @@ const FlashSale = () => {
       <div className="flex items-center justify-between mb-6 px-1">
         <div className="flex items-center gap-4">
           <h2 className="text-2xl font-bold text-gray-900">Flash Sale</h2>
-          <div className="flex items-center gap-2 bg-red-600 text-white px-3 py-1 rounded-md text-sm font-semibold">
+          {/* Timer Display */}
+          <div className="flex items-center gap-2 bg-red-600 text-white px-3 py-1 rounded-md text-sm font-semibold tabular-nums">
             <Timer className="w-4 h-4" />
-            <span>Ends in 04:23:11</span>
+            <span>Ends in {formatTime(timeLeft)}</span>
           </div>
         </div>
         <a href="#" className="text-pink-600 font-medium hover:underline">View All</a>
@@ -76,9 +103,7 @@ const FlashSale = () => {
         {products.map((product) => (
           <div 
             key={product.id} 
-            // Calculated width to show 5 items: (100% - (4 gaps * 16px)) / 5 items
-            // This roughly equals 20% minus the gap adjustment
-            className="min-w-[calc(20%-15px)] flex-shrink-0 bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-lg transition-shadow duration-300"
+            className="min-w-[calc(20%-13px)] flex-shrink-0 bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-lg transition-shadow duration-300"
           >
             {/* Product Image Area */}
             <div className={`relative h-48 w-full ${product.image} flex items-center justify-center`}>
