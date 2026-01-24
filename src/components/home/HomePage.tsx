@@ -3,7 +3,8 @@ import logo from '../../assets/logo.png';
 import text_logo from '../../assets/edelweiss.png';
 import { ShoppingCart, User, Bell, Search} from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
-import HeroCarousel from './hero_carousel';
+import HeroCarousel from './HeroCarousel';
+import PromoCarousel from './PromoCarousel';
 
 type Product = {
 	id: number;
@@ -104,7 +105,8 @@ const HomePage: React.FC = () => {
 
 			<main className="max-w-6xl mx-auto pt-6">
 				<HeroCarousel />
-
+				<PromoCarousel />
+				
 				<section id="products">
 					<h2 className="text-2xl font-semibold mb-4">Featured products</h2>
 					<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">

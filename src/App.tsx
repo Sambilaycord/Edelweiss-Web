@@ -1,6 +1,6 @@
 import React from 'react';
 import LoginPage from "./components/login/LoginPage";
-import HomePage from "./components/home/home";
+import HomePage from "./components/home/HomePage";
 
 function App() {
   return (

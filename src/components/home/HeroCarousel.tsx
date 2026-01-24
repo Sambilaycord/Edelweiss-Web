@@ -42,7 +42,7 @@ const HeroCarousel = () => {
   }, [slides.length]);
 
   return (
-    <section className="relative w-full bg-white rounded-2xl shadow mb-8 overflow-hidden">
+    <section className="relative w-full bg-pink-50 rounded-2xl shadow mb-8 overflow-hidden">
       
       {/* SLIDING TRACK 
          - 'flex' puts items side by side
