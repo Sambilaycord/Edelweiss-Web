@@ -5,6 +5,8 @@ import { ShoppingCart, User, Bell, Search} from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import HeroCarousel from './HeroCarousel';
 import PromoCarousel from './PromoCarousel';
+import FlashSale from './FlashSale';
+import CategoryGrid from './CategoryGrid';
 
 type Product = {
 	id: number;
@@ -106,7 +108,10 @@ const HomePage: React.FC = () => {
 			<main className="max-w-6xl mx-auto pt-6">
 				<HeroCarousel />
 				<PromoCarousel />
+				<CategoryGrid />
+				<FlashSale />
 				
+
 				<section id="products">
 					<h2 className="text-2xl font-semibold mb-4">Featured products</h2>
 					<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">

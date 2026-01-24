@@ -37,7 +37,7 @@ const PromoCarousel = () => {
 
   return (
     // "h-16" sets a fixed short height. "overflow-hidden" hides the other slides.
-    <div className="relative w-full overflow-hidden rounded-xl shadow-sm mb-8 h-16">
+    <div className="relative w-full overflow-hidden rounded-xl shadow-sm h-16">
       
       {/* Sliding Track */}
       <div 
