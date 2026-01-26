@@ -65,7 +65,7 @@ const FlashSale = () => {
     <section className="relative group">
       
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 px-1">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           <h2 className="text-2xl font-bold text-gray-900">Flash Sale</h2>
           {/* Timer Display */}
@@ -103,7 +103,7 @@ const FlashSale = () => {
         {products.map((product) => (
           <div 
             key={product.id} 
-            className="min-w-[calc(20%-13px)] flex-shrink-0 bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-lg transition-shadow duration-300"
+            className="min-w-[calc(20%-15px)] flex-shrink-0 bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-lg transition-shadow duration-300"
           >
             {/* Product Image Area */}
             <div className={`relative h-48 w-full ${product.image} flex items-center justify-center`}>
