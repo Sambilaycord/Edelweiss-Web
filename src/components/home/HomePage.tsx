@@ -7,6 +7,7 @@ import HeroCarousel from './HeroCarousel';
 import PromoCarousel from './PromoCarousel';
 import FlashSale from './FlashSale';
 import CategoryGrid from './CategoryGrid';
+import FeaturedProducts from './FeaturedProducts';
 
 type Product = {
 	id: number;
@@ -22,6 +23,12 @@ const sampleProducts: Product[] = [
 	{ id: 4, name: 'Edelweiss Notebook', price: 7.25, desc: 'Lined notebook, 80 pages.' },
 	{ id: 5, name: 'Edelweiss Sticker Pack', price: 4.5, desc: 'Set of 6 stickers.' },
 	{ id: 6, name: 'Edelweiss Tee', price: 19.99, desc: 'Soft cotton t-shirt.' },
+	{ id: 7, name: 'Edelweiss Tee', price: 19.99, desc: 'Soft cotton t-shirt.' },
+	{ id: 8, name: 'Edelweiss Tee', price: 19.99, desc: 'Soft cotton t-shirt.' },
+	{ id: 9, name: 'Edelweiss Tee', price: 19.99, desc: 'Soft cotton t-shirt.' },
+	{ id: 10, name: 'Edelweiss Tee', price: 19.99, desc: 'Soft cotton t-shirt.' },
+	{ id: 11, name: 'Edelweiss Tee', price: 19.99, desc: 'Soft cotton t-shirt.' },
+	{ id: 12, name: 'Edelweiss Tee', price: 19.99, desc: 'Soft cotton t-shirt.' },
 ];
 
 const HomePage: React.FC = () => {
@@ -73,9 +80,9 @@ const HomePage: React.FC = () => {
 							   <input 
 								   type="text" 
 								   placeholder="Search..." 
-								   className="w-full pl-4 pr-10 py-2 border border-pink-600 rounded-md text-sm focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-colors"
+								   className="w-full pl-4 pr-10 py-2 border border-[#F4898E] rounded-md text-sm focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-colors"
 							   />
-							   <button className="absolute right-0 top-0 h-full px-3 text-pink-600 hover:text-pink-200 transition-colors">
+							   <button className="absolute right-0 top-0 h-full px-3 text-[#F4898E] hover:text-pink-200 transition-colors">
 								   <Search className="w-5 h-5" />
 							   </button>
 						   </div>
@@ -84,7 +91,7 @@ const HomePage: React.FC = () => {
 					{/* Right: Icons */}
 					<div className="flex items-center gap-4">
 						<div className="relative flex items-center gap-3">
-							<button aria-label="Open cart" className="p-2 text-pink-600 hover:bg-pink-50 rounded-full flex items-center justify-center cursor-pointer">
+							<button aria-label="Open cart" className="p-2 text-[#F4898E] hover:bg-pink-50 rounded-full flex items-center justify-center cursor-pointer">
 								<ShoppingCart className="w-6 h-6" />
 							</button>
 							{cartCount > 0 && (
@@ -92,10 +99,10 @@ const HomePage: React.FC = () => {
 									{cartCount}
 								</span>
 							)}
-							<button aria-label="Notifications" onClick={handleUserClick} className="p-2 text-pink-600 rounded-full cursor-pointer hover:bg-pink-50">
+							<button aria-label="Notifications" onClick={handleUserClick} className="p-2 text-[#F4898E] rounded-full cursor-pointer hover:bg-pink-50">
 								<Bell className="w-6 h-6" />
 							</button>
-							<button aria-label="Account" onClick={handleUserClick} className="p-2 text-pink-600 rounded-full cursor-pointer hover:bg-pink-50">
+							<button aria-label="Account" onClick={handleUserClick} className="p-2 text-[#F4898E] rounded-full cursor-pointer hover:bg-pink-50">
 								<User className="w-6 h-6" />
 							</button>
 						</div>
@@ -109,29 +116,9 @@ const HomePage: React.FC = () => {
 				<PromoCarousel />
 				<CategoryGrid />
 				<FlashSale />
-				
+				<FeaturedProducts products={sampleProducts} onAddToCart={addToCart} />
 
-				<section id="products">
-					<h2 className="text-2xl font-semibold mb-4">Featured products</h2>
-					<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-						{sampleProducts.map((p) => (
-							<div key={p.id} className="bg-white rounded-lg shadow p-4 flex flex-col">
-								<div className="h-40 bg-gray-100 rounded-md mb-4 flex items-center justify-center">Image</div>
-								<h3 className="font-semibold text-lg">{p.name}</h3>
-								<p className="text-sm text-gray-600 flex-1">{p.desc}</p>
-								<div className="mt-4 flex items-center justify-between">
-									<div className="text-lg font-bold">${p.price.toFixed(2)}</div>
-									<button
-										onClick={() => addToCart(p)}
-										className="px-3 py-2 bg-pink-600 text-white rounded hover:bg-pink-700"
-									>
-										Add to cart
-									</button>
-								</div>
-							</div>
-						))}
-					</div>
-				</section>
+
 			</main>
 		</div>
 	);

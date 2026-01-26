@@ -67,9 +67,9 @@ const FlashSale = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-bold text-gray-900">Flash Sale</h2>
+          <h2 className="text-2xl font-bold font-serif text-gray-900">Flash Sale</h2>
           {/* Timer Display */}
-          <div className="flex items-center gap-2 bg-red-600 text-white px-3 py-1 rounded-md text-sm font-semibold tabular-nums">
+          <div className="flex items-center gap-2 bg-pink-600 text-white px-3 py-1 rounded-md text-sm font-semibold tabular-nums">
             <Timer className="w-4 h-4" />
             <span>Ends in {formatTime(timeLeft)}</span>
           </div>
@@ -108,7 +108,7 @@ const FlashSale = () => {
             {/* Product Image Area */}
             <div className={`relative h-48 w-full ${product.image} flex items-center justify-center`}>
               <span className="text-gray-400">Image</span>
-              <span className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
+              <span className="absolute top-2 left-2 bg-pink-600 text-white text-xs font-bold px-2 py-1 rounded">
                 {product.discount}
               </span>
             </div>
