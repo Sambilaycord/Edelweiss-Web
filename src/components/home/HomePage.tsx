@@ -48,7 +48,7 @@ const HomePage: React.FC = () => {
 	return (
 		<div className="min-h-screen">
 			<div className="text-sm text-gray-700">
-				<div className="max-w-6xl mx-auto flex justify-end gap-4 py-2 px-6">
+				<div className="max-w-full mx-auto flex justify-end gap-4 py-2 px-10">
 					<a href="/about" className="hover:text-pink-600">About</a>
 					<a href="/contact" className="hover:text-pink-600">Contact</a>
 					<div className="flex items-center gap-2"> 
@@ -59,7 +59,7 @@ const HomePage: React.FC = () => {
 				</div>
 			</div>
 			<header className="sticky top-0 bg-white/95 backdrop-blur z-40 shadow-sm">
-				<div className="max-w-6xl mx-auto flex items-center justify-between py-4 px-6">
+				<div className="max-w-full mx-auto flex items-center justify-between py-4 px-10">
 					
 					{/* Left: Logo */}
 					<div className="flex items-center gap-4">
@@ -67,20 +67,19 @@ const HomePage: React.FC = () => {
 						<img src={text_logo} alt="Edelweiss" className="h-6 object-contain" />
 					</div>
 
-					{/* Center: Search Bar (Added) */}
-					{/* hidden md:flex ensures it only shows on medium screens and up */}
-					<div className="hidden md:flex flex-1 max-w-xl mx-6">
-						<div className="relative w-full">
-							<input 
-								type="text" 
-								placeholder="Search..." 
-								className="w-full pl-4 pr-10 py-2 border border-pink-600 rounded-md text-sm focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-colors"
-							/>
-							<button className="absolute right-0 top-0 h-full px-3 text-pink-600 hover:text-pink-200 transition-colors">
-								<Search className="w-5 h-5" />
-							</button>
-						</div>
-					</div>
+					   {/* Center: Search Bar (40% width, centered) */}
+					   <div className="hidden md:flex w-[40%] mx-auto">
+						   <div className="relative w-full">
+							   <input 
+								   type="text" 
+								   placeholder="Search..." 
+								   className="w-full pl-4 pr-10 py-2 border border-pink-600 rounded-md text-sm focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-colors"
+							   />
+							   <button className="absolute right-0 top-0 h-full px-3 text-pink-600 hover:text-pink-200 transition-colors">
+								   <Search className="w-5 h-5" />
+							   </button>
+						   </div>
+					   </div>
 
 					{/* Right: Icons */}
 					<div className="flex items-center gap-4">
@@ -105,7 +104,7 @@ const HomePage: React.FC = () => {
 				</div>
 			</header>
 
-			<main className="max-w-6xl mx-auto pt-6">
+			<main className="max-w-7/10 mx-auto pt-6">
 				<HeroCarousel />
 				<PromoCarousel />
 				<CategoryGrid />

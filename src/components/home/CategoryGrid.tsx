@@ -12,10 +12,11 @@ const CategoryCircles = () => {
     { id: 6, name: "Vase Sets", placeholder: "Vases" },
     { id: 7, name: "Chocolates", placeholder: "Choco" },
     { id: 8, name: "Chocolates", placeholder: "Choco" },
+    { id: 9, name: "Vase Sets", placeholder: "Vases" },
   ];
 
   return (
-    <section className="py-8 max-w-[1400px] mx-auto">
+    <section className="relative group py-6">
       <h2 className="text-2xl font-bold text-gray-800 mb-6 font-serif">
         Shop by Category
       </h2>
@@ -25,14 +26,14 @@ const CategoryCircles = () => {
         - gap-4 md:gap-8: Adds space between the floating circles (tighter on mobile, wider on desktop)
         - overflow-x-auto: Enables horizontal scrolling
       */}
-      <div className="flex items-start gap-4 md:gap-8 overflow-x-auto scrollbar-hide p-2">
+      <div className=" flex flex-wrap items-start justify-center gap-4 md:gap-8 p-2">
         
         {/* 1. Map through the first 7 categories */}
         {categories.map((cat) => (
           <a 
             key={cat.id} 
             href="#" 
-            className="group flex flex-col items-center flex-shrink-0 w-20 md:w-24 gap-4"
+            className="group flex flex-col items-center flex-1 min-w-[100px] max-w-[160px] gap-4"
           >
             {/* Circular Image Placeholder 
                 - rounded-full: Makes it a perfect circle
@@ -54,7 +55,7 @@ const CategoryCircles = () => {
         {/* 2. The "More Categories" Button (Always at the end) */}
         <a 
           href="/categories" 
-          className="group flex flex-col items-center flex-shrink-0 w-20 md:w-24 gap-3"
+          className="group flex flex-col items-center flex-1 min-w-[100px] max-w-[160px] gap-3"
         >
           {/* Circle styling specific for the 'More' button */}
           <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-pink-50 flex items-center justify-center text-pink-600 group-hover:bg-pink-600 group-hover:text-white group-hover:ring-2 group-hover:ring-pink-600 group-hover:ring-offset-2 transition-all duration-300 shadow-sm border border-pink-100">
