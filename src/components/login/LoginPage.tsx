@@ -1,24 +1,28 @@
 import React, { useState } from 'react';
-import { supabase } from '../../lib/supabaseClient'; // Adjust path
-import logo from '../../assets/logo.png'; // Adjust path
-import text_logo from '../../assets/edelweiss.png'; // Adjust path
-import mail_receive from '../../assets/mail_receive.png'; // Adjust path
-import bg from '../../assets/pink_bg.jpg'; // Adjust path
+import { useNavigate } from 'react-router-dom';
 
-// Import the new components
+import { supabase } from '../../lib/supabaseClient';
+
 import LoginForm from './LoginForm'; 
 import SignupForm from './SignupForm';
 
+import logo from '../../assets/logo.png'; 
+import text_logo from '../../assets/edelweiss.png'; 
+import mail_receive from '../../assets/mail_receive.png'; 
+import bg from '../../assets/pink_bg.jpg'; 
+
 const LoginPage: React.FC = () => {
+  const navigate = useNavigate();
   const [isSignup, setIsSignup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
   // Success Modal States
   const [signupSuccess, setSuccess] = useState('');
+  const [modalTitle, setModalTitle] = useState('Success!');
   const [resendLoading, setResendLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
-  // We need to store email temporarily for the resend function
+  const [timeLeft, setTimeLeft] = useState(0);
   const [tempEmail, setTempEmail] = useState(''); 
 
   const handleLogin = async (formData: any) => {
@@ -29,12 +33,25 @@ const LoginPage: React.FC = () => {
         password: formData.password,
       });
       if (authError) throw authError;
-      console.log('Login successful:', data);
+      navigate('/');
       // Navigate to dashboard here
     } catch (err: any) {
+      if (err.message.includes('Email not confirmed')) {
+        setTempEmail(formData.email);
+        setModalTitle('Verification Required'); 
+        setSuccess('Verify your email before logging in.');
+        return;
+      }
       setError(err.message || 'Login failed');
     }
   };
+
+  React.useEffect(() => {
+    if (timeLeft > 0) {
+      const timerId = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+      return () => clearTimeout(timerId);
+    }
+  }, [timeLeft]);
 
   const handleSignup = async (formData: any) => {
     setError('');
@@ -47,9 +64,18 @@ const LoginPage: React.FC = () => {
         options: { data: { username: formData.username } }
       });
       if (signUpError) throw signUpError;
-      setSuccess('Check your email for a confirmation link.');
+        setModalTitle('Success!'); 
+        setSuccess('Check your email for a confirmation link.');
     } catch (err: any) {
-      setError(err.message || 'Signup failed');
+      if (err.message.includes('User already registered') || err.message.includes('already registered')) {
+         setError('This account is already in use. Please log in instead.');
+      }
+      else if (err.message.includes('Invalid email')) {
+         setError('Please enter a valid email address.');
+      }
+      else{
+        setError(err.message || 'Signup failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -57,7 +83,9 @@ const LoginPage: React.FC = () => {
 
   const handleResendVerification = async () => {
     setResendMessage('');
+    if (timeLeft > 0) return;
     setResendLoading(true);
+    setTimeLeft(60);
     try {
       const { error } = await supabase.auth.resend({ 
         email: tempEmail, 
@@ -66,14 +94,15 @@ const LoginPage: React.FC = () => {
       if (error) throw error;
       setResendMessage('Verification email resent. Check your inbox.');
     } catch (err: any) {
-      setResendMessage(err.message || 'Failed to resend');
+      setResendMessage('Please wait before trying again.');
+      console.log(err.message);
     } finally {
       setResendLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 font-sans bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url(${bg})` }}>
+    <div className="min-h-screen flex items-center justify-center p-4font-sans bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url(${bg})` }}>
       
       {/* --- Success Modal (Overlay) --- */}
       {signupSuccess && (
@@ -81,21 +110,32 @@ const LoginPage: React.FC = () => {
           <div className="absolute inset-0 bg-black opacity-40" />
           <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4 h-[50vh] flex flex-col items-center">
             <button
-               className="absolute top-2 right-3 text-pink-600 hover:text-pink-700 text-4xl leading-none"
+               className="absolute top-1 right-3 text-pink-600 hover:text-pink-700 text-5xl leading-none cursor-pointer"
                onClick={() => { setSuccess(''); setIsSignup(false); }}
             >
               ×
             </button>
-            <img src={mail_receive} alt="Mail Sent" className="w-40 h-auto my-4 object-contain" />
-            <h1 className="text-3xl font-semibold text-pink-600 mb-2">Success!</h1>
+            <img src={mail_receive} alt="Mail Sent" className="w-85 h-auto my-6 object-scale-down" />
+            <h1 className="text-4xl font-semibold text-pink-600 mb-4">{modalTitle}</h1>
             <p className="text-center text-gray-700 mb-4">{signupSuccess}</p>
             {resendMessage && <p className="text-sm text-gray-500 mb-2">{resendMessage}</p>}
             <button
               onClick={handleResendVerification}
-              disabled={resendLoading}
-              className="mt-auto px-4 py-2 bg-pink-600 text-white rounded hover:bg-pink-700 disabled:opacity-50"
+              // Disable if it's loading OR if the timer is still counting down
+              disabled={resendLoading || timeLeft > 0}
+              // Conditional styling: Gray if disabled, Pink if active
+              className={`mt-auto mb-2 px-4 py-2 text-white rounded-lg transition-colors ${
+                resendLoading || timeLeft > 0
+                  ? "bg-gray-400" // Gray & blocked cursor
+                  : "bg-pink-600 hover:bg-pink-700 cursor-pointer" // Pink & clickable
+              }`}
             >
-              {resendLoading ? 'Sending...' : 'Resend Verification Email'}
+              {/* Dynamic Text Logic */}
+              {resendLoading
+                ? "Sending..."
+                : timeLeft > 0
+                ? `Resend available in ${timeLeft}s` // Shows countdown
+                : "Resend Verification Email"}
             </button>
           </div>
         </div>
