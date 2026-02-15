@@ -1,11 +1,12 @@
 import React, { useState} from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-
-import logo from '../../assets/logo.png';
-import text_logo from '../../assets/edelweiss.png';
+import { motion } from 'framer-motion';
 
 import { ShoppingCart, User, Bell, Search} from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+
+import logo from '../../assets/logo.png';
+import text_logo from '../../assets/edelweiss.png';
 
 import HeroCarousel from './HeroCarousel';
 import PromoCarousel from './PromoCarousel';
@@ -58,7 +59,13 @@ const HomePage: React.FC = () => {
 	};
 
 	return (
-		<div className="min-h-screen">
+		<motion.div 
+            initial={{ opacity: 0 }}       // Starts invisible
+            animate={{ opacity: 1 }}       // Fades in to visible
+            exit={{ opacity: 0 }}          // Fades out when leaving
+            transition={{ duration: 0.5 }} // Smooth 0.5s transition
+            className="min-h-screen"
+        >
 			<div className="text-sm text-gray-700">
 				<div className="max-w-full mx-auto flex justify-end gap-4 py-2 px-10">
 					<a href="/about" className="hover:text-pink-600">About</a>
@@ -125,7 +132,7 @@ const HomePage: React.FC = () => {
 
 
 			</main>
-		</div>
+		</motion.div>
 	);
 };
 

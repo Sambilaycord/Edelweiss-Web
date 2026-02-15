@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
+import { supabase } from '../../lib/supabaseClient';
+
 import LoginForm from './LoginForm'; 
 import SignupForm from './SignupForm';
 
@@ -102,10 +104,10 @@ const LoginPage: React.FC = () => {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
+      initial={{ opacity: 0.5 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 1}}
+      transition={{ duration: 0.5}}
       className="min-h-screen flex items-center justify-center p-4 font-sans bg-cover bg-center bg-no-repeat"
       style={{ backgroundImage: `url(${bg})` }}
     >
