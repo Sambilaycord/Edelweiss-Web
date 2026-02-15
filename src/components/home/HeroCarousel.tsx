@@ -60,8 +60,8 @@ const HeroCarousel = () => {
             className="w-full flex-shrink-0 grid grid-cols-1 md:grid-cols-2 gap-8 items-center p-8 min-h-[400px]"
           >
             {/* Text Side */}
-            <div>
-              <h1 className="text-4xl font-bold text-pink-600 mb-4">
+            <div className="p-12">
+              <h1 className="text-4xl font-bold text-pink-600 mb-4 ">
                 {slide.title}
               </h1>
               <p className="text-gray-700 mb-6 text-lg">

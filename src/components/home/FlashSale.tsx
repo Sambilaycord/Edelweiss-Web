@@ -122,7 +122,7 @@ const FlashSale = () => {
                 <span className="text-gray-400 text-sm line-through">${product.oldPrice.toFixed(2)}</span>
               </div>
 
-              <button className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white py-2 rounded-lg text-sm font-medium hover:bg-pink-600 transition-colors">
+              <button className="w-full flex items-center justify-center gap-2 bg-pink-700 text-white py-2 rounded-lg text-sm font-medium hover:bg-pink-600 transition-colors">
                 <ShoppingCart className="w-4 h-4" />
                 Add to Cart
               </button>
