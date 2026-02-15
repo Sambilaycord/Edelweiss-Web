@@ -72,7 +72,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, onSwitchToLogin, erro
           {loading ? 'Signing Up...' : 'Sign Up'}
         </button>
 
-        <div className="mt-3 text-sm text-gray-600 text-center">
+        <div className="mt-3 text-m text-gray-600 text-center">
           Already have an account?{' '}
           <button type="button" onClick={onSwitchToLogin} className="text-pink-600 underline cursor-pointer">
             Log in

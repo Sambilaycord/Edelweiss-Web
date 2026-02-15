@@ -21,8 +21,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, error
 
   return (
     <div className="w-full flex flex-col justify-center p-12 h-full">
-      <h1 className="text-4xl font-bold text-pink-600">Welcome Back!</h1>
-      <p className="mt-4 text-gray-600">Log in to your Edelweiss account</p>
+      <h1 className="text-4xl font-bold text-pink-600 text-center">Welcome Back!</h1>
+      <p className="mt-4 text-gray-600 text-center">Log in to your Edelweiss account</p>
 
       <form className="mt-8 w-full" onSubmit={handleSubmit}>
         {error && (
@@ -75,7 +75,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, error
         </button>
       </form>
 
-      <p className="mt-4 text-gray-600">
+      <p className="mt-4 text-gray-600 text-center">
         Don't have an account?{' '}
         <button type="button" onClick={onSwitchToSignup} className="text-pink-600 underline cursor-pointer">
           Sign up
