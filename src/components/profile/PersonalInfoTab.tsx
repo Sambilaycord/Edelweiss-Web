@@ -1,4 +1,3 @@
-// src/components/profile/PersonalInfoTab.tsx
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Save, Loader2 } from 'lucide-react';
@@ -38,6 +37,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
       )}
 
       <form onSubmit={onSave} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Names */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
           <input 
@@ -60,6 +60,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
           />
         </div>
 
+        {/* Email - Full Row */}
         <div className="md:col-span-2"> 
           <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
           <input 
@@ -70,6 +71,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
           />
         </div>
 
+        {/* Cell Number - Full Row */}
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Cell Number</label>
           <input 
@@ -81,6 +83,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
           />
         </div>
 
+        {/* Gender Selection */}
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
           <div className="flex items-center gap-6">
@@ -105,6 +108,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
           </div>
         </div>
 
+        {/* Birthday - Full Row */}
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
           <input 
@@ -115,11 +119,12 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
           />
         </div>
 
+        {/* Submit */}
         <div className="md:col-span-2 mt-4">
           <button 
             type="submit" 
             disabled={updating} 
-            className="flex items-center gap-2 bg-pink-600 text-white px-6 py-2 rounded-lg hover:bg-pink-700 transition-colors disabled:opacity-70 cursor-pointer"
+            className="flex items-center gap-2 bg-pink-600 text-white px-8 py-2.5 rounded-lg hover:bg-pink-700 transition-colors disabled:opacity-70 cursor-pointer font-medium"
           >
             {updating ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
             {updating ? 'Saving...' : 'Save Changes'}
