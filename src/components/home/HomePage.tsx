@@ -2,8 +2,6 @@ import React, { useState} from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
-import { supabase } from '../../lib/supabaseClient';
-
 import Navbar from '../common/Navbar';
 import HeroCarousel from './HeroCarousel';
 import PromoCarousel from './PromoCarousel';
@@ -35,21 +33,6 @@ const sampleProducts: Product[] = [
 
 const HomePage: React.FC = () => {
 	const [cartCount, setCartCount] = useState(0);
-	const navigate = useNavigate();
-
-		const handleUserClick = async () => {
-			try {
-				const res = await supabase.auth.getUser();
-				const user = (res && (res as any).data && (res as any).data.user) || null;
-				if (!user) {
-					navigate('/login');
-				} else {
-					window.location.href = '/profile';
-				}
-			} catch (err) {
-				window.location.href = '/login';
-			}
-		};
 
 	const addToCart = (p: Product) => {
 		setCartCount((c) => c + 1);
