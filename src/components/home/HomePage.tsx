@@ -1,8 +1,12 @@
 import React, { useState} from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+
 import logo from '../../assets/logo.png';
 import text_logo from '../../assets/edelweiss.png';
+
 import { ShoppingCart, User, Bell, Search} from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+
 import HeroCarousel from './HeroCarousel';
 import PromoCarousel from './PromoCarousel';
 import FlashSale from './FlashSale';
@@ -33,13 +37,14 @@ const sampleProducts: Product[] = [
 
 const HomePage: React.FC = () => {
 	const [cartCount, setCartCount] = useState(0);
+	const navigate = useNavigate();
 
 		const handleUserClick = async () => {
 			try {
 				const res = await supabase.auth.getUser();
 				const user = (res && (res as any).data && (res as any).data.user) || null;
 				if (!user) {
-					window.location.href = '/login';
+					navigate('/login');
 				} else {
 					window.location.href = '/profile';
 				}
