@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { supabase } from '../../lib/supabaseClient'; // Adjust path
-import logo from '../../assets/logo.png'; // Adjust path
-import text_logo from '../../assets/edelweiss.png'; // Adjust path
-import mail_receive from '../../assets/mail_receive.png'; // Adjust path
-import bg from '../../assets/pink_bg.jpg'; // Adjust path
+import { motion } from 'framer-motion';
+import { supabase } from '../../lib/supabaseClient';
+import logo from '../../assets/logo.png'; 
+import text_logo from '../../assets/edelweiss.png'; 
+import mail_receive from '../../assets/mail_receive.png';
+import bg from '../../assets/pink_bg.jpg'; 
 
 // Import the new components
 import LoginForm from './LoginForm'; 
@@ -73,7 +74,14 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 font-sans bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url(${bg})` }}>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 1}}
+      className="min-h-screen flex items-center justify-center p-4 font-sans bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: `url(${bg})` }}
+    >
       
       {/* --- Success Modal (Overlay) --- */}
       {signupSuccess && (
@@ -102,8 +110,18 @@ const LoginPage: React.FC = () => {
       )}
 
       {/* --- Main Sliding Card --- */}
-      <div className="relative w-full bg-white max-w-4xl rounded-[20px] shadow-md overflow-hidden min-h-[550px] flex">
-        
+      <motion.div 
+        initial={{ y: 50, opacity: 0 }} // Starts 50px down and invisible
+        animate={{ y: 0, opacity: 1 }}  // Moves to center and becomes visible
+        exit={{ y: 50, opacity: 0 }}    // Slides back down when leaving
+        transition={{ 
+          type: "spring",               // "spring" gives it a slight bounce effect
+          stiffness: 100, 
+          damping: 20, 
+          delay: 0.2                    // Waits 0.2s so background loads first
+        }}
+        className="relative w-full bg-white max-w-4xl rounded-[20px] shadow-md overflow-hidden min-h-[550px] flex"
+        >
         {/* 1. Sliding Logo Panel */}
         <div
           className="absolute top-0 bottom-0 w-1/2 flex flex-col items-center justify-center p-12 transition-transform duration-700 ease-in-out z-20"
@@ -138,9 +156,8 @@ const LoginPage: React.FC = () => {
              loading={loading}
            />
         </div>
-
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 
