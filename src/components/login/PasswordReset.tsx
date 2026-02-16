@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabaseClient';
-import { ArrowLeft, KeyRound, Mail, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, KeyRound, Mail, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import bg from '../../assets/pink_bg.jpg';
 
 const PasswordReset: React.FC = () => {
@@ -12,6 +13,9 @@ const PasswordReset: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // 1. Send Recovery Code
   const handleSendCode = async (e: React.FormEvent) => {
@@ -52,12 +56,22 @@ const PasswordReset: React.FC = () => {
   // 3. Update Password
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
-      navigate('/login', { state: { message: 'Password reset successful! Please log in.' } });
+      
+      setTimeout(() => {
+        navigate('/login', { state: { message: 'Password reset successful!' } });
+      }, 500);
+
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -67,7 +81,14 @@ const PasswordReset: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-cover bg-center p-4" style={{ backgroundImage: `url(${bg})` }}>
-      <div className="bg-white w-full max-w-md rounded-[20px] shadow-2xl p-10 relative overflow-hidden">
+      <AnimatePresence>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="bg-white w-full max-w-md rounded-[20px] shadow-2xl p-10 relative overflow-hidden"
+        >
         
         {/* Back Button */}
         <button 
@@ -148,18 +169,59 @@ const PasswordReset: React.FC = () => {
           {/* STEP 3: RESET PASSWORD */}
           {step === 'reset' && (
             <form onSubmit={handleUpdatePassword} className="w-full space-y-4">
-              <input 
-                type="password" required placeholder="Enter new password"
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none"
-                value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
-              />
-              <button disabled={loading} className="w-full bg-pink-600 text-white py-3 rounded-xl font-bold hover:bg-pink-700 transition-all cursor-pointer">
+              {/* New Password Field */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-500 ml-1">New Password</label>
+                <div className="relative">
+                  <input 
+                    type={showNewPassword ? "text" : "password"} 
+                    required 
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none transition-all pr-12"
+                    value={newPassword} 
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                  >
+                    {showNewPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm Password Field */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-500 ml-1">Confirm New Password</label>
+                <div className="relative">
+                  <input 
+                    type={showConfirmPassword ? "text" : "password"} 
+                    required 
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none transition-all pr-12"
+                    value={confirmPassword} 
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                  >
+                    {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+
+              <button 
+                disabled={loading} 
+                className="w-full bg-pink-600 text-white py-3 mt-2 rounded-xl font-bold hover:bg-pink-700 transition-all shadow-lg shadow-pink-100 cursor-pointer disabled:opacity-50"
+              >
                 {loading ? "Updating..." : "Update Password"}
               </button>
             </form>
           )}
         </div>
-      </div>
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 };

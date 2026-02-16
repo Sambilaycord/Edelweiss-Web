@@ -1,5 +1,5 @@
 // src/components/auth/LoginForm.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 
 interface LoginFormProps {
@@ -14,6 +14,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, onFor
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (error) {
+      setPassword(''); 
+    }
+  }, [error]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

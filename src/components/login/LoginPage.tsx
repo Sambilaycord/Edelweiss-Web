@@ -16,6 +16,7 @@ const LoginPage: React.FC = () => {
   const [isSignup, setIsSignup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [formKey, setFormKey] = useState(0);
   
   // Success Modal States for Signup
   const [signupSuccess, setSuccess] = useState('');
@@ -101,10 +102,28 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  // NEW: Simple Navigation to the Password Reset Page
+  const handleCloseModal = () => {
+    setSuccess('');
+    setIsSignup(false);
+    setError('');
+    setFormKey(prev => prev + 1); // Incrementing the key forces the forms to reset
+  };
+
   const handlePasswordReset = () => {
     navigate('/password-reset');
   };
+
+  const toggleToSignup = () => {
+    setError(''); 
+    setIsSignup(true);
+  };
+
+  const toggleToLogin = () => {
+    setError(''); 
+    setIsSignup(false);
+  };
+
+  
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 font-sans bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url(${bg})` }}>
@@ -116,7 +135,7 @@ const LoginPage: React.FC = () => {
           <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4 h-[50vh] flex flex-col items-center">
             <button
                className="absolute top-1 right-3 text-pink-600 hover:text-pink-700 text-5xl leading-none cursor-pointer"
-               onClick={() => { setSuccess(''); setIsSignup(false); }}
+               onClick={handleCloseModal}
             >
               ×
             </button>
@@ -155,8 +174,9 @@ const LoginPage: React.FC = () => {
           style={{ right: 0, opacity: isSignup ? 1 : 0, pointerEvents: isSignup ? 'auto' : 'none' }}
         >
            <SignupForm 
+             key={`signup-${formKey}`}
              onSubmit={handleSignup} 
-             onSwitchToLogin={() => setIsSignup(false)} 
+             onSwitchToLogin={toggleToLogin}
              error={isSignup ? error : ''}
              loading={loading}
            />
@@ -168,8 +188,9 @@ const LoginPage: React.FC = () => {
           style={{ opacity: isSignup ? 0 : 1, pointerEvents: isSignup ? 'none' : 'auto' }}
         >
            <LoginForm 
+             key={`login-${formKey}`}
              onSubmit={handleLogin} 
-             onSwitchToSignup={() => setIsSignup(true)}
+             onSwitchToSignup={toggleToSignup}
              onForgotPassword={handlePasswordReset} 
              error={!isSignup ? error : ''}
              loading={loading}
