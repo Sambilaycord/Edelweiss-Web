@@ -5,11 +5,12 @@ import { Eye, EyeOff } from 'lucide-react';
 interface LoginFormProps {
   onSubmit: (formData: any) => void;
   onSwitchToSignup: () => void;
+  onForgotPassword: (email: string) => void;
   error?: string;
   loading?: boolean;
 }
 
-const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, error, loading }) => {
+const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, onForgotPassword, error, loading }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -44,7 +45,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, error
           />
         </div>
 
-        <div className="mb-4">
+        <div className="mb-2">
           <label className="block text-gray-700 mb-2" htmlFor="login-password">Password</label>
           <div className="relative">
             <input
@@ -64,6 +65,16 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, error
               {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
           </div>
+        </div>
+
+        <div className="flex mb-4 justify-end">
+          <button 
+            type="button" 
+            onClick={() => onForgotPassword(email)} 
+            className="text-sm text-pink-600 hover:underline cursor-pointer"
+          >
+            Forgot Password?
+          </button>
         </div>
 
         <button
