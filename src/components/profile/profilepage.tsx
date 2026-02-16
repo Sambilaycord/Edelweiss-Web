@@ -75,14 +75,13 @@ const ProfilePage: React.FC = () => {
     try {
       const { error } = await supabase.from('profiles').upsert({
         id: sessionUser.id,
-        first_name: profile.first_name,
-        last_name: profile.last_name,
-        phone_number: profile.phone_number,
-        username: profile.username,
-        avatar_url: profile.avatar_url,
+        first_name: profile.first_name || null,
+        last_name: profile.last_name || null,
+        phone_number: profile.phone_number || null,
+        username: profile.username || null,
+        avatar_url: profile.avatar_url || null,
         gender: profile.gender || null,
         birthdate: profile.birthdate || null,
-        updated_at: new Date(),
       });
       if (error) throw error;
       setMessage({ text: 'Profile updated successfully!', type: 'success' });
@@ -120,7 +119,7 @@ const ProfilePage: React.FC = () => {
                   </button>
                 </div>
                 <h2 className="font-semibold text-gray-800 text-center">
-                  {profile.first_name ? `${profile.first_name} ${profile.last_name}` : profile.username || 'User'}
+                  {profile.username || 'User'}
                 </h2>
                 <p className="text-sm text-gray-500">{profile.email}</p>
               </div>

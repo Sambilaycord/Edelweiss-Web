@@ -1,6 +1,9 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Save, Loader2 } from 'lucide-react';
+import PhoneInput from 'react-phone-number-input'
+import { Save, Loader2, Phone } from 'lucide-react';
+import 'react-phone-number-input/style.css'
+import '../../styles/index.css';
 
 interface ProfileData {
   first_name: string | null;
@@ -74,12 +77,12 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
         {/* Cell Number - Full Row */}
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Cell Number</label>
-          <input 
-            type="tel" 
+          <PhoneInput
+            international
+            defaultCountry="PH"
             value={profile.phone_number || ''}
-            onChange={(e) => setProfile({ ...profile, phone_number: e.target.value })}
-            placeholder="1234567890"
-            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-pink-500 outline-none transition-shadow" 
+            onChange={(val) => setProfile({ ...profile, phone_number: val })}
+            className="flex w-full border border-gray-300 rounded-lg px-4 py-2 focus-within:ring-2 focus-within:ring-pink-500 outline-none transition-shadow"
           />
         </div>
 
