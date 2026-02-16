@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { Store, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Store, ArrowRight, ArrowLeft, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 
 interface SellerOnboardingProps {
   role: 'customer' | 'shop_owner' | 'admin';
@@ -77,54 +77,74 @@ const SellerOnboardingTab: React.FC<SellerOnboardingProps> = ({ role, profile, o
   if (isRegistering) {
     return (
       <div className="max-w-xl mx-auto">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">Setup Your Shop</h2>
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl flex items-center gap-3 border border-red-100">
-            <AlertCircle size={20} />
-            <span className="text-sm">{error}</span>
-          </div>
-        )}
-        <form onSubmit={handleRegisterShop} className="space-y-5">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Shop Name</label>
-            <input 
-              type="text" required value={shopName} onChange={(e) => setShopName(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none transition-all"
-              placeholder="e.g., Edelweiss Flowers & Gifts"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Business Phone (Optional)</label>
-            <input 
-              type="text" value={businessPhone} onChange={(e) => setBusinessPhone(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none transition-all"
-              placeholder={profile?.phone_number || "Contact number for customers"}
-            />
-            <p className="text-xs text-gray-400 mt-1 italic">Defaults to your personal number if empty.</p>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
-            <textarea 
-              rows={4} value={description} onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none transition-all resize-none"
-              placeholder="Tell customers about your shop..."
-            />
-          </div>
-          <div className="flex gap-4 pt-4">
-            <button 
-              type="button" onClick={() => setIsRegistering(false)}
-              className="flex-1 py-3 text-gray-500 font-bold hover:bg-gray-50 rounded-xl transition-colors"
-            >
-              Cancel
-            </button>
-            <button 
-              type="submit" disabled={loading}
-              className="flex-1 bg-pink-600 text-white py-3 rounded-xl font-bold hover:bg-pink-700 transition-all shadow-lg shadow-pink-200 disabled:opacity-50"
-            >
-              {loading ? "Launching..." : "Launch Shop"}
-            </button>
-          </div>
-        </form>
+        {/* Navigation Row - Separated from the form content */}
+        <div className="flex items-center mb-6 -ml-20">
+          <button 
+            onClick={() => setIsRegistering(false)}
+            className="text-gray-400 hover:text-pink-600 transition-colors flex items-center gap-2 text-sm font-semibold cursor-pointer group"
+          >
+            <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+            Go Back
+          </button>
+        </div>
+
+        {/* Main Content Area */}
+        <div className="relative">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">Setup Your Shop</h2>
+          
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl flex items-center gap-3 border border-red-100">
+              <AlertCircle size={20} />
+              <span className="text-sm">{error}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleRegisterShop} className="space-y-5">
+            {/* Form Fields ... same as before */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Shop Name</label>
+              <input 
+                type="text" required value={shopName} onChange={(e) => setShopName(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none transition-all"
+                placeholder="e.g., Edelweiss Flowers & Gifts"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Business Phone (Optional)</label>
+              <input 
+                type="text" value={businessPhone} onChange={(e) => setBusinessPhone(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none transition-all"
+                placeholder={profile?.phone_number || "Contact number for customers"}
+              />
+              <p className="text-xs text-gray-400 mt-1 italic">Defaults to your personal number if empty.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+              <textarea 
+                rows={4} value={description} onChange={(e) => setDescription(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 outline-none transition-all resize-none"
+                placeholder="Tell customers about your shop..."
+              />
+            </div>
+
+            {/* Centered Launch Shop Button */}
+            <div className="flex justify-center pt-6">
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full max-w-xs bg-pink-600 text-white py-3.5 rounded-xl font-bold hover:bg-pink-700 transition-all shadow-lg shadow-pink-200 disabled:opacity-50 cursor-pointer"
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="animate-spin" size={20} /> Launching...
+                  </span>
+                ) : "Launch Shop"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     );
   }
