@@ -1,18 +1,25 @@
 // src/components/auth/LoginForm.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 
 interface LoginFormProps {
   onSubmit: (formData: any) => void;
   onSwitchToSignup: () => void;
+  onForgotPassword: (email: string) => void;
   error?: string;
   loading?: boolean;
 }
 
-const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, error, loading }) => {
+const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, onForgotPassword, error, loading }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (error) {
+      setPassword(''); 
+    }
+  }, [error]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,8 +28,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, error
 
   return (
     <div className="w-full flex flex-col justify-center p-12 h-full">
-      <h1 className="text-4xl font-bold text-pink-600">Welcome Back!</h1>
-      <p className="mt-4 text-gray-600">Log in to your Edelweiss account</p>
+      <h1 className="text-4xl font-bold text-pink-600 text-center">Welcome Back!</h1>
+      <p className="mt-4 text-gray-600 text-center">Log in to your Edelweiss account</p>
 
       <form className="mt-8 w-full" onSubmit={handleSubmit}>
         {error && (
@@ -44,7 +51,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, error
           />
         </div>
 
-        <div className="mb-4">
+        <div className="mb-2">
           <label className="block text-gray-700 mb-2" htmlFor="login-password">Password</label>
           <div className="relative">
             <input
@@ -66,6 +73,16 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, error
           </div>
         </div>
 
+        <div className="flex mb-4 justify-end">
+          <button 
+            type="button" 
+            onClick={() => onForgotPassword(email)} 
+            className="text-sm text-pink-600 hover:underline cursor-pointer"
+          >
+            Forgot Password?
+          </button>
+        </div>
+
         <button
           type="submit"
           disabled={loading}
@@ -75,7 +92,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, error
         </button>
       </form>
 
-      <p className="mt-4 text-gray-600">
+      <p className="mt-4 text-gray-600 text-center">
         Don't have an account?{' '}
         <button type="button" onClick={onSwitchToSignup} className="text-pink-600 underline cursor-pointer">
           Sign up
