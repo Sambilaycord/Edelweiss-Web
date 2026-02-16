@@ -1,18 +1,22 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom'; // Add this
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
+
 import LoginPage from "./components/login/LoginPage";
-import HomePage from "./components/home/home";
+import HomePage from "./components/home/HomePage";
 import PasswordReset from "./components/login/PasswordReset";
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/password-reset" element={<PasswordReset />} />
-      </Routes>
-    </BrowserRouter>
+    <AnimatePresence mode="wait">
+      <Router>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/password-reset" element={<PasswordReset />} />
+        </Routes>
+      </Router>
+    </AnimatePresence>
   );
 }
 

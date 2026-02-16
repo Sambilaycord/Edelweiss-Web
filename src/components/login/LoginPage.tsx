@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+
 import { supabase } from '../../lib/supabaseClient';
 
 import LoginForm from './LoginForm'; 
@@ -127,7 +129,14 @@ const LoginPage: React.FC = () => {
   
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 font-sans bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url(${bg})` }}>
+    <motion.div
+      initial={{ opacity: 0.5 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.5}}
+      className="min-h-screen flex items-center justify-center p-4 font-sans bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: `url(${bg})` }}
+    >
       
       {/* --- Signup Success Modal --- */}
       {signupSuccess && (
@@ -178,9 +187,19 @@ const LoginPage: React.FC = () => {
       </div>
 
       {/* --- Main Sliding Card --- */}
-      <div className="relative w-full bg-white max-w-4xl rounded-[20px] shadow-md overflow-hidden min-h-[550px] flex">
-        
-        {/* Sliding Logo Panel */}
+      <motion.div 
+        initial={{ y: 50, opacity: 0 }} // Starts 50px down and invisible
+        animate={{ y: 0, opacity: 1 }}  // Moves to center and becomes visible
+        exit={{ y: 50, opacity: 0 }}    // Slides back down when leaving
+        transition={{ 
+          type: "spring",               // "spring" gives it a slight bounce effect
+          stiffness: 100, 
+          damping: 20, 
+          delay: 0.2                    // Waits 0.2s so background loads first
+        }}
+        className="relative w-full bg-white max-w-4xl rounded-[20px] shadow-md overflow-hidden min-h-[650px] flex"
+        >
+        {/* 1. Sliding Logo Panel */}
         <div
           className="absolute top-0 bottom-0 w-1/2 flex flex-col items-center justify-center p-12 transition-transform duration-700 ease-in-out z-20"
           style={{ right: 0, transform: isSignup ? 'translateX(-100%)' : 'translateX(0)' }}
@@ -217,8 +236,8 @@ const LoginPage: React.FC = () => {
              loading={loading}
            />
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 
