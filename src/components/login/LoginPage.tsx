@@ -176,7 +176,7 @@ const LoginPage: React.FC = () => {
           damping: 20, 
           delay: 0.2                    // Waits 0.2s so background loads first
         }}
-        className="relative w-full bg-white max-w-4xl rounded-[20px] shadow-md overflow-hidden min-h-[550px] flex"
+        className="relative w-full bg-white max-w-4xl rounded-[20px] shadow-md overflow-hidden min-h-[650px] flex"
         >
         {/* 1. Sliding Logo Panel */}
         <div
