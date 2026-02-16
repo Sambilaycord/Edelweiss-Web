@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabaseClient';
 import Navbar from '../common/Navbar';
-import PersonalInfoTab from './PersonalInfoTab';
 
-import { User, Package, Heart, MapPin, LogOut, Settings, Camera, Loader2 } from 'lucide-react';
+import PersonalInfoTab from './PersonalInfoTab';
+import SellerOnboardingTab from './SellerOnboardingTab';
+
+import { User, Package, Heart, MapPin, LogOut, Settings, Camera, Loader2, Store } from 'lucide-react';
 
 interface ProfileData {
   username: string | null;
@@ -24,6 +26,8 @@ const ProfilePage: React.FC = () => {
   const [updating, setUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const [sessionUser, setSessionUser] = useState<any>(null);
+  const [role, setRole] = useState<'customer' | 'shop_owner' | 'admin'>('customer');
+  const [isRegisteringShop, setIsRegisteringShop] = useState(false);
 
   const [profile, setProfile] = useState<ProfileData>({
     username: '',
@@ -47,22 +51,23 @@ const ProfilePage: React.FC = () => {
 
         const { data, error } = await supabase
           .from('profiles')
-          .select('username, first_name, last_name, phone_number, avatar_url, gender, birthdate')
+          .select('username, first_name, last_name, phone_number, avatar_url, gender, birthdate, role')
           .eq('id', session.user.id)
           .single();
 
-        if (error && error.code !== 'PGRST116') console.error('Error:', error);
-
-        setProfile({
-          username: data?.username || session.user.user_metadata?.username || '',
-          first_name: data?.first_name || '',
-          last_name: data?.last_name || '',
-          phone_number: data?.phone_number || '',
-          email: session.user.email || '',
-          avatar_url: data?.avatar_url || null,
-          gender: data?.gender || '',
-          birthdate: data?.birthdate || '',
-        });
+        if (data) {
+          setRole(data.role as any);
+          setProfile({
+            username: data?.username || session.user.user_metadata?.username || '',
+            first_name: data?.first_name || '',
+            last_name: data?.last_name || '',
+            phone_number: data?.phone_number || '',
+            email: session.user.email || '',
+            avatar_url: data?.avatar_url || null,
+            gender: data?.gender || '',
+            birthdate: data?.birthdate || '',
+          });
+        }
       } catch (err) { console.error(err); } finally { setLoading(false); }
     };
     getProfile();
@@ -129,6 +134,7 @@ const ProfilePage: React.FC = () => {
                 <SidebarItem icon={<Heart size={18}/>} label="Wishlist" isActive={activeTab === 'wishlist'} onClick={() => setActiveTab('wishlist')} />
                 <SidebarItem icon={<MapPin size={18}/>} label="Addresses" isActive={activeTab === 'address'} onClick={() => setActiveTab('address')} />
                 <SidebarItem icon={<Settings size={18}/>} label="Settings" isActive={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+                <SidebarItem icon={<Store size={18}/>} label={role === 'shop_owner' ? "My Shop" : "Sell on Edelweiss"} isActive={activeTab === 'shop'} onClick={() => setActiveTab('shop')}/>
                 <div className="my-2 border-t border-gray-100"></div>
                 <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-50 rounded-lg text-sm font-medium cursor-pointer">
                   <LogOut size={18} /> Sign Out
@@ -146,6 +152,16 @@ const ProfilePage: React.FC = () => {
                   onSave={updateProfile}
                   updating={updating}
                   message={message}
+                />
+              )}
+              {activeTab === 'shop' && (
+                <SellerOnboardingTab 
+                  role={role} 
+                  profile={profile} 
+                  onSuccess={() => {
+                    setRole('shop_owner');
+                    setActiveTab('shop');
+                  }}
                 />
               )}
               {activeTab === 'orders' && (
