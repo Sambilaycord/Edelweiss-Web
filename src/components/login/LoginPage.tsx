@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabaseClient';
 
 import LoginForm from './LoginForm'; 
 import SignupForm from './SignupForm';
+import '../../styles/index.css';
 
 import logo from '../../assets/logo.png'; 
 import text_logo from '../../assets/edelweiss.png'; 
@@ -17,8 +18,9 @@ const LoginPage: React.FC = () => {
   const [isSignup, setIsSignup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [formKey, setFormKey] = useState(0);
   
-  // Success Modal States
+  // Success Modal States for Signup
   const [signupSuccess, setSuccess] = useState('');
   const [modalTitle, setModalTitle] = useState('Success!');
   const [resendLoading, setResendLoading] = useState(false);
@@ -26,16 +28,17 @@ const LoginPage: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [tempEmail, setTempEmail] = useState(''); 
 
+  // Handle standard Login
   const handleLogin = async (formData: any) => {
     setError('');
+    setLoading(true);
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
+      const { error: authError } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       });
       if (authError) throw authError;
       navigate('/');
-      // Navigate to dashboard here
     } catch (err: any) {
       if (err.message.includes('Email not confirmed')) {
         setTempEmail(formData.email);
@@ -44,9 +47,12 @@ const LoginPage: React.FC = () => {
         return;
       }
       setError(err.message || 'Login failed');
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Timer for Signup Resend
   React.useEffect(() => {
     if (timeLeft > 0) {
       const timerId = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
@@ -54,10 +60,11 @@ const LoginPage: React.FC = () => {
     }
   }, [timeLeft]);
 
+  // Handle Signup
   const handleSignup = async (formData: any) => {
     setError('');
     setLoading(true);
-    setTempEmail(formData.email); // Store for potential resend
+    setTempEmail(formData.email);
     try {
       const { error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
@@ -65,16 +72,12 @@ const LoginPage: React.FC = () => {
         options: { data: { username: formData.username } }
       });
       if (signUpError) throw signUpError;
-        setModalTitle('Success!'); 
-        setSuccess('Check your email for a confirmation link.');
+      setModalTitle('Success!'); 
+      setSuccess('Check your email for a confirmation link.');
     } catch (err: any) {
-      if (err.message.includes('User already registered') || err.message.includes('already registered')) {
+      if (err.message.includes('already registered')) {
          setError('This account is already in use. Please log in instead.');
-      }
-      else if (err.message.includes('Invalid email')) {
-         setError('Please enter a valid email address.');
-      }
-      else{
+      } else {
         setError(err.message || 'Signup failed');
       }
     } finally {
@@ -96,11 +99,33 @@ const LoginPage: React.FC = () => {
       setResendMessage('Verification email resent. Check your inbox.');
     } catch (err: any) {
       setResendMessage('Please wait before trying again.');
-      console.log(err.message);
     } finally {
       setResendLoading(false);
     }
   };
+
+  const handleCloseModal = () => {
+    setSuccess('');
+    setIsSignup(false);
+    setError('');
+    setFormKey(prev => prev + 1); // Incrementing the key forces the forms to reset
+  };
+
+  const handlePasswordReset = () => {
+    navigate('/password-reset');
+  };
+
+  const toggleToSignup = () => {
+    setError(''); 
+    setIsSignup(true);
+  };
+
+  const toggleToLogin = () => {
+    setError(''); 
+    setIsSignup(false);
+  };
+
+  
 
   return (
     <motion.div
@@ -112,14 +137,14 @@ const LoginPage: React.FC = () => {
       style={{ backgroundImage: `url(${bg})` }}
     >
       
-      {/* --- Success Modal (Overlay) --- */}
+      {/* --- Signup Success Modal --- */}
       {signupSuccess && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black opacity-40" />
           <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4 h-[50vh] flex flex-col items-center">
             <button
                className="absolute top-1 right-3 text-pink-600 hover:text-pink-700 text-5xl leading-none cursor-pointer"
-               onClick={() => { setSuccess(''); setIsSignup(false); }}
+               onClick={handleCloseModal}
             >
               ×
             </button>
@@ -129,21 +154,12 @@ const LoginPage: React.FC = () => {
             {resendMessage && <p className="text-sm text-gray-500 mb-2">{resendMessage}</p>}
             <button
               onClick={handleResendVerification}
-              // Disable if it's loading OR if the timer is still counting down
               disabled={resendLoading || timeLeft > 0}
-              // Conditional styling: Gray if disabled, Pink if active
               className={`mt-auto mb-2 px-4 py-2 text-white rounded-lg transition-colors ${
-                resendLoading || timeLeft > 0
-                  ? "bg-gray-400" // Gray & blocked cursor
-                  : "bg-pink-600 hover:bg-pink-700 cursor-pointer" // Pink & clickable
+                resendLoading || timeLeft > 0 ? "bg-gray-400" : "bg-pink-600 hover:bg-pink-700 cursor-pointer"
               }`}
             >
-              {/* Dynamic Text Logic */}
-              {resendLoading
-                ? "Sending..."
-                : timeLeft > 0
-                ? `Resend available in ${timeLeft}s` // Shows countdown
-                : "Resend Verification Email"}
+              {resendLoading ? "Sending..." : timeLeft > 0 ? `Resend available in ${timeLeft}s` : "Resend Verification Email"}
             </button>
           </div>
         </div>
@@ -171,27 +187,30 @@ const LoginPage: React.FC = () => {
           <img src={text_logo} alt="Edelweiss" className="mb-8 w-48 h-auto object-contain" />
         </div>
 
-        {/* 2. Signup Form Container (Left side) */}
+        {/* Signup Form Container */}
         <div
           className="absolute top-0 bottom-0 w-1/2 rounded-l-[20px] shadow-xl transition-opacity duration-700"
           style={{ right: 0, opacity: isSignup ? 1 : 0, pointerEvents: isSignup ? 'auto' : 'none' }}
         >
            <SignupForm 
+             key={`signup-${formKey}`}
              onSubmit={handleSignup} 
-             onSwitchToLogin={() => setIsSignup(false)} 
+             onSwitchToLogin={toggleToLogin}
              error={isSignup ? error : ''}
              loading={loading}
            />
         </div>
 
-        {/* 3. Login Form Container (Right side) */}
+        {/* Login Form Container */}
         <div
           className="absolute left-0 top-0 bottom-0 w-1/2 bg-white shadow-xl rounded-r-[20px] transition-opacity duration-700"
           style={{ opacity: isSignup ? 0 : 1, pointerEvents: isSignup ? 'none' : 'auto' }}
         >
            <LoginForm 
+             key={`login-${formKey}`}
              onSubmit={handleLogin} 
-             onSwitchToSignup={() => setIsSignup(true)} 
+             onSwitchToSignup={toggleToSignup}
+             onForgotPassword={handlePasswordReset} 
              error={!isSignup ? error : ''}
              loading={loading}
            />
