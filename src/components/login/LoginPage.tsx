@@ -10,6 +10,7 @@ import logo from '../../assets/logo.png';
 import text_logo from '../../assets/edelweiss.png'; 
 import mail_receive from '../../assets/mail_receive.png'; 
 import bg from '../../assets/pink_bg.jpg'; 
+import { ArrowLeft } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -155,6 +156,26 @@ const LoginPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <div className="absolute top-0 left-0 w-full p-6 flex justify-between items-center z-50">
+        <div 
+          className="flex items-center gap-2 cursor-pointer group"
+          onClick={() => navigate('/')}
+        >
+          <img src={logo} alt="Edelweiss" className="w-8 h-8 object-contain group-hover:scale-110 transition-transform" />
+          <span className="text-white font-bold text-xl drop-shadow-sm">Edelweiss</span>
+        </div>
+        
+        <button 
+          onClick={() => navigate('/')}
+          className="text-white hover:text-white-100 text-sm font-bold flex items-center gap-2 border-2 border-white rounded-full transition-all px-4 py-2 cursor-pointer"
+        >
+          <ArrowLeft size={18} className="drop-shadow-lg" /> 
+          <span className="drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]">
+            Back to Home
+          </span>
+        </button>
+      </div>
 
       {/* --- Main Sliding Card --- */}
       <div className="relative w-full bg-white max-w-4xl rounded-[20px] shadow-md overflow-hidden min-h-[550px] flex">
