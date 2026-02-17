@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { X, Loader2, ChevronDown } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
@@ -6,31 +6,51 @@ import 'react-phone-number-input/style.css';
 
 interface AddAddressModalProps {
   profile: any;
+  addressToEdit?: any; // Added this prop to support editing
   onClose: () => void;
   onSuccess: () => void;
 }
 
-const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, onClose, onSuccess }) => {
+const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, addressToEdit, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
+  
+  // 1. Initialize state: prioritize addressToEdit, then profile defaults
   const [formData, setFormData] = useState({
-    receiver_name: profile?.first_name || profile?.last_name 
+    receiver_name: addressToEdit?.receiver_name || 
+      (profile?.first_name || profile?.last_name 
         ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() 
-        : '',
-    phone_number: profile?.phone_number || '',
-    region: '',
-    province: '',
-    city: '',
-    barangay: '',
-    postal_code: '', // Now strictly enforced in handleSubmit
-    detailed_address: '',
-    label: 'Home',
-    is_default: false
+        : ''),
+    phone_number: addressToEdit?.phone_number || profile?.phone_number || '',
+    region: addressToEdit?.region || '',
+    province: addressToEdit?.province || '',
+    city: addressToEdit?.city_municipality || '', // Match DB column name
+    barangay: addressToEdit?.barangay || '',
+    postal_code: addressToEdit?.postal_code || '',
+    detailed_address: addressToEdit?.detailed_address || '',
+    label: addressToEdit?.label || 'Home',
+    is_default: addressToEdit?.is_default || false
   });
+
+  // 2. Sync state if addressToEdit changes while modal is open
+  useEffect(() => {
+    if (addressToEdit) {
+      setFormData({
+        receiver_name: addressToEdit.receiver_name,
+        phone_number: addressToEdit.phone_number,
+        region: addressToEdit.region,
+        province: addressToEdit.province,
+        city: addressToEdit.city_municipality,
+        barangay: addressToEdit.barangay,
+        postal_code: addressToEdit.postal_code,
+        detailed_address: addressToEdit.detailed_address,
+        label: addressToEdit.label,
+        is_default: addressToEdit.is_default
+      });
+    }
+  }, [addressToEdit]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Extra safety check for postal_code
     if (!formData.postal_code) {
       alert("Postal Code is required.");
       return;
@@ -46,7 +66,8 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, onClose, onS
         await supabase.from('addresses').update({ is_default: false }).eq('user_id', user.id);
       }
 
-      const { error } = await supabase.from('addresses').insert([{
+      // 3. Prepare payload for UPSERT
+      const payload = {
         user_id: user.id,
         receiver_name: formData.receiver_name,
         phone_number: formData.phone_number,
@@ -54,11 +75,16 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, onClose, onS
         province: formData.province,
         city_municipality: formData.city,
         barangay: formData.barangay,
-        postal_code: formData.postal_code, // DB will reject if null
+        postal_code: formData.postal_code,
         detailed_address: formData.detailed_address,
         is_default: formData.is_default,
-        label: formData.label
-      }]);
+        label: formData.label,
+        ...(addressToEdit?.id && { id: addressToEdit.id })
+      };
+
+      const { error } = await supabase
+        .from('addresses')
+        .upsert(payload); 
 
       if (error) throw error;
       onSuccess();
@@ -74,8 +100,8 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, onClose, onS
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 text-left">
       <div className="bg-white w-full max-w-2xl rounded-[24px] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="p-6 border-b flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-800 tracking-tight">New Address</h2>
+        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+          <h2 className="text-2xl font-bold text-gray-800 tracking-widest">New Address</h2>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer">
             <X size={20} className="text-gray-400" />
           </button>

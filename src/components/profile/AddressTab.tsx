@@ -13,10 +13,6 @@ const AddressTab: React.FC<AddressTabProps> = ({ profile }) => {
   const [showModal, setShowModal] = useState(false);
   const [editingAddress, setEditingAddress] = useState<any | null>(null);
 
-  useEffect(() => {
-    fetchAddresses();
-  }, []);
-
   const fetchAddresses = async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -30,6 +26,10 @@ const AddressTab: React.FC<AddressTabProps> = ({ profile }) => {
     }
     setLoading(false);
   };
+
+  useEffect(() => {
+    fetchAddresses();
+  }, []);
 
   const deleteAddress = async (id: string) => {
     const { error } = await supabase.from('addresses').delete().eq('id', id);
