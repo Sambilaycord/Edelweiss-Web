@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabaseClient';
 
 import LoginForm from './LoginForm'; 
 import SignupForm from './SignupForm';
+import { validateField, sanitizeInput } from '../../utils/characterValidation';
 import '../../styles/index.css';
 
 import logo from '../../assets/logo.png'; 
@@ -33,6 +34,16 @@ const LoginPage: React.FC = () => {
   const handleLogin = async (formData: any) => {
     setError('');
     setLoading(true);
+    e.preventDefault();
+
+    const cleanEmail = sanitizeInput(formData.email);
+    const error = validateField('email', cleanEmail);
+
+    if (error) {
+      setError(error);
+      return;
+    }
+
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({
         email: formData.email,
@@ -65,7 +76,22 @@ const LoginPage: React.FC = () => {
   const handleSignup = async (formData: any) => {
     setError('');
     setLoading(true);
+    
+    const cleanEmail = sanitizeInput(formData.email);
+    const cleanUsername = sanitizeInput(formData.username);
+
+    const emailError = validateField('email', cleanEmail);
+    const userError = validateField('username', cleanUsername);
+    const passError = validateField('password', formData.password);
+
+    if (emailError || userError || passError) {
+      setError(userError || passError || emailError);
+      setLoading(false);
+      return;
+    }
+
     setTempEmail(formData.email);
+
     try {
       const { error: signUpError } = await supabase.auth.signUp({
         email: formData.email,

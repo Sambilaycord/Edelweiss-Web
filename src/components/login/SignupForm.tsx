@@ -47,9 +47,10 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, onSwitchToLogin, erro
           <input
             type="text"
             value={username}
+            maxLength={20}
             onChange={(e) => setUsername(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none"
-            placeholder="Your name"
+            placeholder="Username"
             required
           />
         </div>
@@ -59,6 +60,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, onSwitchToLogin, erro
           <input
             type="email"
             value={email}
+            maxLength={254}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none"
             placeholder="Email"
@@ -73,6 +75,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, onSwitchToLogin, erro
             <input
               type={showPassword ? "text" : "password"}
               value={password}
+              maxLength={64}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none pr-10"
               placeholder="Password"
@@ -95,6 +98,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, onSwitchToLogin, erro
             <input
               type={showConfirmPassword ? "text" : "password"}
               value={confirmPassword}
+              maxLength={64}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none pr-10"
               placeholder="Re-enter password"

@@ -44,6 +44,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, onFor
             type="email"
             id="login-email"
             value={email}
+            maxLength={254}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
             placeholder="Enter your email"
@@ -58,6 +59,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, onFor
               type={showPassword ? "text" : "password"}
               id="login-password"
               value={password}
+              maxLength={64}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 pr-10"
               placeholder="Enter your password"
