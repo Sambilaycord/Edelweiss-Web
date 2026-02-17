@@ -9,7 +9,8 @@ import PasswordReset from "./components/login/PasswordReset";
 import ProfilePage from "./components/profile/ProfilePage";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import SellerRegistration from './components/profile/SellerRegistration';
-import CartPage from './components/cart/CartPage'; // Imported CartPage
+import CartPage from './components/cart/CartPage';
+import CheckoutPage from './components/checkout/CheckoutPage';
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -38,6 +39,14 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/cart" element={<CartPage />} />
+          <Route 
+            path="/checkout" 
+            element={
+              <ProtectedRoute>
+                <CheckoutPage />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="/login" 
             element={session ? <Navigate to="/" replace /> : <LoginPage />} 
