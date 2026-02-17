@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, ChevronDown } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 
@@ -21,7 +21,7 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, onClose, onS
     province: '',
     city: '',
     barangay: '',
-    postal_code: '',
+    postal_code: '', // Now strictly enforced in handleSubmit
     detailed_address: '',
     label: 'Home',
     is_default: false
@@ -29,6 +29,13 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, onClose, onS
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Extra safety check for postal_code
+    if (!formData.postal_code) {
+      alert("Postal Code is required.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -47,7 +54,7 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, onClose, onS
         province: formData.province,
         city_municipality: formData.city,
         barangay: formData.barangay,
-        postal_code: formData.postal_code,
+        postal_code: formData.postal_code, // DB will reject if null
         detailed_address: formData.detailed_address,
         is_default: formData.is_default,
         label: formData.label
@@ -68,7 +75,7 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, onClose, onS
       <div className="bg-white w-full max-w-2xl rounded-[24px] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="p-6 border-b flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-800">New Address</h2>
+          <h2 className="text-xl font-bold text-gray-800 tracking-tight">New Address</h2>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer">
             <X size={20} className="text-gray-400" />
           </button>
@@ -83,8 +90,9 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, onClose, onS
               <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-widest">Full Name</label>
               <input 
                 type="text" required value={formData.receiver_name}
+                placeholder="e.g. Juan Dela Cruz"
                 onChange={(e) => setFormData({...formData, receiver_name: e.target.value})}
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-500 outline-none"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-500 outline-none transition-shadow"
               />
             </div>
             <div>
@@ -93,27 +101,42 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, onClose, onS
                 international defaultCountry="PH"
                 value={formData.phone_number}
                 onChange={(val) => setFormData({...formData, phone_number: val || ''})}
-                className="flex w-full border border-gray-200 rounded-xl px-4 py-3 focus-within:ring-2 focus-within:ring-pink-500 outline-none"
+                className="flex w-full border border-gray-200 rounded-xl px-4 py-3 focus-within:ring-2 focus-within:ring-pink-500 outline-none transition-shadow"
               />
             </div>
 
             {/* Region & Province Row */}
-            <div>
-              <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-widest">Region</label>
-              <input 
-                type="text" required value={formData.region}
-                placeholder="e.g. Mindanao"
-                onChange={(e) => setFormData({...formData, region: e.target.value})}
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-500 outline-none"
-              />
+            <div className="space-y-1">
+                <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-widest">Region</label>
+                <div className="relative">
+                    <select 
+                    required
+                    value={formData.region}
+                    onChange={(e) => setFormData({...formData, region: e.target.value})}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-500 outline-none bg-white cursor-pointer transition-all appearance-none pr-12"
+                    >
+                    <option value="" disabled>Select Region</option>
+                    <option value="Metro Manila">Metro Manila</option>
+                    <option value="Mindanao">Mindanao</option>
+                    <option value="North Luzon">North Luzon</option>
+                    <option value="South Luzon">South Luzon</option>
+                    <option value="Visayas">Visayas</option>
+                    </select>
+                    
+                    {/* This icon replaces the browser default and is positioned 16px (right-4) from the edge */}
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                    <ChevronDown size={18} />
+                    </div>
+                </div>
             </div>
+
             <div>
               <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-widest">Province</label>
               <input 
                 type="text" required value={formData.province}
-                placeholder="e.g. Misamis Oriental"
+                placeholder="e.g. Benguet"
                 onChange={(e) => setFormData({...formData, province: e.target.value})}
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-500 outline-none"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-500 outline-none transition-shadow"
               />
             </div>
 
@@ -122,9 +145,9 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, onClose, onS
               <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-widest">City / Municipality</label>
               <input 
                 type="text" required value={formData.city}
-                placeholder="e.g. Cagayan De Oro City"
+                placeholder="e.g. Quezon City"
                 onChange={(e) => setFormData({...formData, city: e.target.value})}
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-500 outline-none"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-500 outline-none transition-shadow"
               />
             </div>
 
@@ -133,18 +156,18 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, onClose, onS
               <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-widest">Barangay</label>
               <input 
                 type="text" required value={formData.barangay}
-                placeholder="e.g. Macasandig"
+                placeholder="e.g. San Lorenzo"
                 onChange={(e) => setFormData({...formData, barangay: e.target.value})}
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-500 outline-none"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-500 outline-none transition-shadow"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-widest">Postal Code</label>
               <input 
                 type="text" required value={formData.postal_code}
-                placeholder="e.g. 9000"
+                placeholder="e.g. 1100"
                 onChange={(e) => setFormData({...formData, postal_code: e.target.value})}
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-500 outline-none"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-500 outline-none transition-shadow"
               />
             </div>
 
@@ -152,22 +175,22 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, onClose, onS
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-widest">Street Name, Building, House No.</label>
               <textarea 
-                required placeholder="e.g. Blk 22 Lot 6, Woodland Heights"
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-500 outline-none resize-none"
+                required placeholder="e.g. 123 Orchid St, Greenview Subdivision"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-pink-500 outline-none resize-none transition-shadow"
                 rows={2} value={formData.detailed_address}
                 onChange={(e) => setFormData({...formData, detailed_address: e.target.value})}
               />
             </div>
 
             {/* Default Setting */}
-            <div className="md:col-span-2 flex items-center gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+            <div className="md:col-span-2 flex items-center gap-3 bg-pink-50/30 p-4 rounded-xl border border-pink-100">
               <input 
                 type="checkbox" id="default"
                 checked={formData.is_default}
                 onChange={(e) => setFormData({...formData, is_default: e.target.checked})}
                 className="w-5 h-5 accent-pink-600 rounded cursor-pointer"
               />
-              <label htmlFor="default" className="text-sm font-semibold text-gray-700 cursor-pointer">Set as default delivery address</label>
+              <label htmlFor="default" className="text-sm font-semibold text-pink-700 cursor-pointer">Set as default delivery address</label>
             </div>
           </div>
 
