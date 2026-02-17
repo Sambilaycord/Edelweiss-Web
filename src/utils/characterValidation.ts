@@ -16,8 +16,25 @@ export const VALIDATION_RULES = {
     regex: /^[a-zA-Z0-9_.-]+$/,
     errorMessage: "Username can only contain letters, numbers, underscores, dots, and hyphens.",
   },
+  firstName: {
+    minLength: 1,
+    maxLength: 50,
+    regex: /^[a-zA-Z\s.-]+$/,
+    errorMessage: "First name can only contain letters, spaces, dots, and hyphens.",
+  },
+  lastName: {
+    minLength: 1,
+    maxLength: 50,
+    regex: /^[a-zA-Z\s.-]+$/,
+    errorMessage: "Last name can only contain letters, spaces, dots, and hyphens.",
+  },
+  bio: {
+    maxLength: 160,
+    regex: /^[^<>\"\'\\]*$/,
+    errorMessage: "Bio contains restricted special characters.",
+  },
   postalCode: {
-    regex: /^\d{4}$/, // Strictly 4 digits for PH postal codes
+    regex: /^\d{4}$/,
     errorMessage: "Postal code must be exactly 4 digits.",
   }
 };

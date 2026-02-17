@@ -34,7 +34,6 @@ const LoginPage: React.FC = () => {
   const handleLogin = async (formData: any) => {
     setError('');
     setLoading(true);
-    e.preventDefault();
 
     const cleanEmail = sanitizeInput(formData.email);
     const error = validateField('email', cleanEmail);
