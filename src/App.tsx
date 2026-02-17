@@ -8,6 +8,7 @@ import HomePage from "./components/home/HomePage";
 import PasswordReset from "./components/login/PasswordReset";
 import ProfilePage from "./components/profile/ProfilePage";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import SellerRegistration from './components/profile/SellerRegistration';
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -53,6 +54,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <ProfilePage />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/become-a-seller" 
+            element={
+              <ProtectedRoute>
+                <SellerRegistration />
               </ProtectedRoute>
             } 
           />

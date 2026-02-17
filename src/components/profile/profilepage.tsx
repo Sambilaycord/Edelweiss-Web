@@ -3,9 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabaseClient';
 import Navbar from '../common/Navbar';
+import { useLocation } from 'react-router-dom'
+import confetti from 'canvas-confetti';
 
 import PersonalInfoTab from './PersonalInfoTab';
 import SellerOnboardingTab from './SellerOnboardingTab';
+import AddressTab from './AddressTab';
 
 import { User, Package, Heart, MapPin, LogOut, Settings, Camera, Loader2, Store } from 'lucide-react';
 
@@ -27,7 +30,7 @@ const ProfilePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('profile');
   const [sessionUser, setSessionUser] = useState<any>(null);
   const [role, setRole] = useState<'customer' | 'shop_owner' | 'admin'>('customer');
-  const [isRegisteringShop, setIsRegisteringShop] = useState(false);
+  const location = useLocation();
 
   const [profile, setProfile] = useState<ProfileData>({
     username: '',
@@ -72,6 +75,34 @@ const ProfilePage: React.FC = () => {
     };
     getProfile();
   }, [navigate]);
+
+  useEffect(() => {
+    // Check if we arrived here from a successful registration
+    if (location.state?.confetti) {
+      // Fire the confetti!
+      const duration = 3 * 1000;
+      const animationEnd = Date.now() + duration;
+      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+      const interval: any = setInterval(function() {
+        const timeLeft = animationEnd - Date.now();
+
+        if (timeLeft <= 0) {
+          return clearInterval(interval);
+        }
+
+        const particleCount = 50 * (timeLeft / duration);
+        // Since Edelweiss is pink-themed, let's use pink and gold!
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }, colors: ['#db2777', '#fbcfe8', '#fbbf24'] });
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }, colors: ['#db2777', '#fbcfe8', '#fbbf24'] });
+      }, 250);
+      
+      // Clean up the state so it doesn't fire again on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   const updateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,6 +200,9 @@ const ProfilePage: React.FC = () => {
                   <Package size={48} className="mx-auto mb-4 text-gray-300" />
                   <p>No orders yet.</p>
                 </div>
+              )}
+              {activeTab === 'address' && (
+                <AddressTab />
               )}
             </div>
           </main>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Store, ArrowRight, ArrowLeft, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface SellerOnboardingProps {
   role: 'customer' | 'shop_owner' | 'admin';
@@ -12,6 +13,7 @@ const SellerOnboardingTab: React.FC<SellerOnboardingProps> = ({ role, profile, o
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const navigate = useNavigate();
   
   // Form States
   const [shopName, setShopName] = useState('');
@@ -58,7 +60,7 @@ const SellerOnboardingTab: React.FC<SellerOnboardingProps> = ({ role, profile, o
   // 1. IF ALREADY A SELLER: Show Dashboard Link
   if (role === 'shop_owner') {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
+      <div className="flex flex-col items-center justify-center py-20">
         <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center text-green-600 mb-4">
           <CheckCircle2 size={32} />
         </div>
@@ -166,7 +168,7 @@ const SellerOnboardingTab: React.FC<SellerOnboardingProps> = ({ role, profile, o
         <FeatureItem text="Customizable shop branding" />
       </div>
       <button 
-        onClick={() => setIsRegistering(true)}
+        onClick={() => navigate('/become-a-seller')} // Link to the new page
         className="group flex items-center gap-2 bg-pink-600 text-white px-10 py-4 rounded-2xl font-bold hover:bg-pink-700 transition-all shadow-xl shadow-pink-100 cursor-pointer"
       >
         Open Your Shop Now <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
