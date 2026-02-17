@@ -133,7 +133,7 @@ const AddressTab: React.FC<AddressTabProps> = ({ profile }) => {
       {showModal && (
         <AddAddressModal 
           profile={profile} 
-          addressToEdit={editingAddress} // Pass the data if editing
+          addressToEdit={editingAddress} 
           onClose={() => setShowModal(false)} 
           onSuccess={() => {
             fetchAddresses();

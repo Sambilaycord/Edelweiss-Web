@@ -46,6 +46,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
           <input 
             type="text" 
             value={profile.first_name || ''}
+            maxLength={50}
             onChange={(e) => setProfile({ ...profile, first_name: e.target.value })}
             placeholder="Enter First Name"
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-pink-500 outline-none transition-shadow" 
@@ -57,6 +58,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
           <input 
             type="text" 
             value={profile.last_name || ''}
+            maxLength={50}
             onChange={(e) => setProfile({ ...profile, last_name: e.target.value })}
             placeholder="Enter Last Name"
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-pink-500 outline-none transition-shadow" 
@@ -69,6 +71,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
           <input 
             type="email" 
             disabled 
+            maxLength={254}
             value={profile.email || ''} 
             className="w-full border border-gray-300 bg-gray-100 text-gray-500 rounded-lg px-4 py-2 cursor-not-allowed" 
           />
@@ -80,6 +83,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
           <PhoneInput
             international
             defaultCountry="PH"
+            limitMaxLength={true}
             value={profile.phone_number || ''}
             onChange={(val) => setProfile({ ...profile, phone_number: val })}
             className="flex w-full border border-gray-300 rounded-lg px-4 py-2 focus-within:ring-2 focus-within:ring-pink-500 outline-none transition-shadow"

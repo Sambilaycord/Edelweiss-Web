@@ -9,6 +9,7 @@ import confetti from 'canvas-confetti';
 import PersonalInfoTab from './PersonalInfoTab';
 import SellerOnboardingTab from './SellerOnboardingTab';
 import AddressTab from './AddressTab';
+import { validateField, sanitizeInput } from '../../utils/characterValidation';
 
 import { User, Package, Heart, MapPin, LogOut, Settings, Camera, Loader2, Store } from 'lucide-react';
 
@@ -108,6 +109,24 @@ const ProfilePage: React.FC = () => {
     e.preventDefault();
     setUpdating(true);
     setMessage(null);
+
+    const cleanFirst = sanitizeInput(profile.first_name || '');
+    const cleanLast = sanitizeInput(profile.last_name || '');
+    const cleanUsername = sanitizeInput(profile.username || '');
+
+    const userError = validateField('username', cleanUsername);
+    const firstError = validateField('firstName', cleanFirst);
+    const lastError = validateField('lastName', cleanLast);
+
+    if (userError || firstError || lastError) {
+      setMessage({ 
+        text: userError || firstError || lastError || 'Invalid input', 
+        type: 'error' 
+      });
+      setUpdating(false);
+      return; // Exit function
+    }
+
     try {
       const { error } = await supabase.from('profiles').upsert({
         id: sessionUser.id,

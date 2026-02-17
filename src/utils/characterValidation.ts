@@ -6,7 +6,7 @@ export const VALIDATION_RULES = {
   },
   password: {
     minLength: 8,
-    maxLength: 254,
+    maxLength: 254, 
     regex: /^[a-zA-Z0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]+$/,
     errorMessage: "Password must be 8-72 characters and contain no spaces.",
   },
@@ -28,11 +28,6 @@ export const VALIDATION_RULES = {
     regex: /^[a-zA-Z\s.-]+$/,
     errorMessage: "Last name can only contain letters, spaces, dots, and hyphens.",
   },
-  bio: {
-    maxLength: 160,
-    regex: /^[^<>\"\'\\]*$/,
-    errorMessage: "Bio contains restricted special characters.",
-  },
   postalCode: {
     regex: /^\d{4}$/,
     errorMessage: "Postal code must be exactly 4 digits.",
@@ -46,24 +41,33 @@ export const sanitizeInput = (val: string): string => {
 export const validateField = (type: keyof typeof VALIDATION_RULES, value: string): string | null => {
   const rule = VALIDATION_RULES[type];
   
-  if (!value) return "This field is required.";
-
-  const fieldLabel = type.charAt(0).toUpperCase() + type.slice(1);
+  const labels: Record<string, string> = {
+    firstName: "First name",
+    lastName: "Last name",
+    postalCode: "Postal code",
+    email: "Email",
+    password: "Password",
+    username: "Username"
+  };
   
-  if (type === 'username' && !/[a-zA-Z]/.test(value)) {
-    return "Username must contain at least one letter.";
+  const fieldLabel = labels[type] || type.charAt(0).toUpperCase() + type.slice(1);
+
+  if (!value) return `${fieldLabel} is required.`;
+  const needsLetter = ['username', 'firstName', 'lastName'].includes(type);
+  if (needsLetter && !/[a-zA-Z]/.test(value)) {
+    return `${fieldLabel} must contain at least one letter.`;
+  }
+  if (!rule.regex.test(value)) {
+    return rule.errorMessage;
   }
 
+  // Length checks
   if ('minLength' in rule && value.length < rule.minLength!) {
     return `${fieldLabel} must be at least ${rule.minLength} characters.`;
   }
   
   if ('maxLength' in rule && value.length > rule.maxLength!) {
     return `${fieldLabel} exceeds maximum length of ${rule.maxLength}.`;
-  }
-  
-  if (!rule.regex.test(value)) {
-    return rule.errorMessage;
   }
   
   return null; 
