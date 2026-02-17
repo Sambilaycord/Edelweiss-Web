@@ -1,50 +1,60 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
-import { MapPin, CreditCard, ChevronRight, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { MapPin, CreditCard, ChevronDown, ChevronUp, Loader2, ArrowLeft, CheckCircle2, ChevronRight, Plus } from 'lucide-react';
 import Navbar from '../common/Navbar';
 
 const CheckoutPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  
-  // 1. Receive data from CartPage
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const { items = [], discount: initialDiscount = 0 } = location.state || {};
   
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [address, setAddress] = useState<any>(null);
+  const [addresses, setAddresses] = useState<any[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [showAllAddresses, setShowAllAddresses] = useState(false); 
   const [paymentMethod, setPaymentMethod] = useState('cod');
 
-  // 2. Promo Code States
   const [promoCode, setPromoCode] = useState('');
   const [appliedDiscount, setAppliedDiscount] = useState(initialDiscount);
   const [promoMessage, setPromoMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
-    if (items.length === 0) {
-      navigate('/cart');
-      return;
-    }
-    fetchDefaultAddress();
-  }, []);
+    if (items.length === 0) { navigate('/cart'); return; }
+    fetchAllAddresses();
 
-  const fetchDefaultAddress = async () => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowAllAddresses(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [items, navigate]);
+
+  const fetchAllAddresses = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { data } = await supabase
         .from('addresses')
         .select('*')
         .eq('user_id', user.id)
-        .eq('is_default', true)
-        .maybeSingle();
-      setAddress(data);
+        .order('is_default', { ascending: false });
+      
+      setAddresses(data || []);
+      const defaultAddr = data?.find(a => a.is_default) || data?.[0];
+      if (defaultAddr) setSelectedAddressId(defaultAddr.id);
     }
     setLoading(false);
   };
 
+  const activeAddress = addresses.find(a => a.id === selectedAddressId);
+  const otherAddresses = addresses.filter(a => a.id !== selectedAddressId);
+
   const handleApplyPromo = () => {
-    // Validation logic matching your CartPage
     if (promoCode.toUpperCase() === 'EDELWEISS2026') {
       setAppliedDiscount(100); 
       setPromoMessage({ text: 'Promo code applied!', type: 'success' });
@@ -56,12 +66,10 @@ const CheckoutPage: React.FC = () => {
 
   const subtotal = items.reduce((acc: number, item: any) => acc + (item.products.price * item.quantity), 0);
   const shipping = 50;
-  // Final total calculation
   const total = Math.max(0, subtotal + shipping - appliedDiscount);
 
   const handlePlaceOrder = async () => {
     setProcessing(true);
-    // Order creation logic for 'orders' and 'order_items' tables
     setTimeout(() => {
       setProcessing(false);
       navigate('/profile', { state: { confetti: true } });
@@ -85,40 +93,101 @@ const CheckoutPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Delivery Address Section */}
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                  <MapPin size={20} className="text-[#F4898E]" /> Delivery Address
+            {/* Address Selection Section */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 relative" ref={dropdownRef}>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <MapPin size={22} className="text-[#F4898E]" /> Delivery Address
                 </h2>
-                <button onClick={() => navigate('/profile')} className="text-xs font-bold text-pink-600 hover:text-pink-700">Change</button>
+                {/* Replaced Pencil with Manage Addresses Text */}
+                <button 
+                  onClick={() => navigate('/profile', { state: { activeTab: 'address' } })}
+                  className="text-sm font-semibold text-pink-600 hover:underline flex items-center gap-1 cursor-pointer transition-all"
+                >
+                  Manage Addresses <ChevronRight size={14} />
+                </button>
               </div>
               
-              {address ? (
-                <div className="bg-pink-50/30 border border-pink-100 rounded-2xl p-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-bold text-gray-900">{address.receiver_name}</span>
-                    <span className="text-gray-400 text-sm">| {address.phone_number}</span>
+              {activeAddress ? (
+                <div className="space-y-2">
+                  {/* Highlighted Selected Address Box */}
+                  <div className="bg-pink-50/30 border-2 border-pink-500 rounded-2xl p-6 transition-all">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold text-gray-900">{activeAddress.receiver_name}</span>
+                      <span className="text-gray-400 text-sm">| {activeAddress.phone_number}</span>
+                      {activeAddress.is_default && (
+                        <span className="text-[9px] bg-pink-100 text-pink-600 px-1.5 py-0.5 rounded-full font-bold uppercase">Default</span>
+                      )}
+                    </div>
+                    <p className="text-gray-500 text-sm leading-relaxed">
+                      {activeAddress.detailed_address}, {activeAddress.barangay}, {activeAddress.city_municipality}, {activeAddress.province}
+                    </p>
                   </div>
-                  <p className="text-gray-500 text-sm">{address.detailed_address}, {address.barangay}, {address.city_municipality}, {address.province}</p>
+
+                  {/* Show More Button (Outside and Below) */}
+                  <div className="flex justify-end px-1">
+                    <button 
+                      onClick={() => setShowAllAddresses(!showAllAddresses)}
+                      className="flex items-center gap-1 text-[10px] mt-2 font-semibold text-pink-600 hover:text-pink-700 uppercase tracking-widest cursor-pointer transition-all"
+                    >
+                      {showAllAddresses ? "Show Less" : "Show More"}
+                      {showAllAddresses ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                  </div>
+
+                  {/* Dropdown of other addresses */}
+                  {showAllAddresses && (
+                    <div className="grid grid-cols-1 gap-3 mt-4 animate-in slide-in-from-top-2 duration-200">
+                      {otherAddresses.length > 0 ? (
+                        otherAddresses.map((addr) => (
+                          <button 
+                            key={addr.id}
+                            onClick={() => {
+                              setSelectedAddressId(addr.id);
+                              setShowAllAddresses(false);
+                            }}
+                            className="text-left p-5 border border-gray-100 rounded-2xl hover:border-pink-200 hover:bg-gray-50 transition-all bg-white flex justify-between items-center group cursor-pointer"
+                          >
+                            <div className="space-y-1">
+                              <p className="font-bold text-gray-800 text-sm">
+                                {addr.receiver_name} <span className="text-gray-400 font-normal text-xs">| {addr.phone_number}</span>
+                              </p>
+                              <p className="text-gray-500 text-xs truncate max-w-sm">{addr.detailed_address}, {addr.barangay}</p>
+                            </div>
+                            <div className="text-gray-200 group-hover:text-pink-300 transition-colors">
+                              <CheckCircle2 size={18} />
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="p-6 border border-dashed border-gray-100 rounded-2xl text-center">
+                          <p className="text-xs text-gray-400 italic">No other saved addresses found.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
-                <button onClick={() => navigate('/profile')} className="w-full py-4 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 font-medium hover:border-pink-300 hover:text-pink-500 transition-all">
-                  + Add Delivery Address
+                <button 
+                  onClick={() => navigate('/profile', { state: { activeTab: 'address' } })}
+                  className="w-full py-10 border-2 border-dashed border-gray-200 rounded-3xl text-gray-400 font-bold hover:border-pink-300 hover:text-pink-500 transition-all flex flex-col items-center gap-3 cursor-pointer"
+                >
+                  <Plus size={32} />
+                  Add a Delivery Address to continue
                 </button>
               )}
             </div>
 
             {/* Order Items Review */}
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-              <h2 className="text-lg font-bold text-gray-800 mb-4">Order Summary</h2>
-              <div className="space-y-4">
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+              <h2 className="text-xl font-bold text-gray-800 mb-6">Order Items</h2>
+              <div className="divide-y divide-gray-50">
                 {items.map((item: any) => (
-                  <div key={item.id} className="flex gap-4 items-center">
+                  <div key={item.id} className="flex gap-4 py-4 first:pt-0 last:pb-0 items-center">
                     <img src={item.products.image_url} className="w-16 h-16 object-cover rounded-xl border border-gray-100" alt="" />
                     <div className="flex-1">
                       <h4 className="font-bold text-gray-800 text-sm">{item.products.name}</h4>
-                      <p className="text-gray-400 text-xs">Qty: {item.quantity}</p>
+                      <p className="text-gray-400 text-xs mt-0.5">Quantity: {item.quantity}</p>
                     </div>
                     <p className="font-bold text-gray-800 text-sm">₱{(item.products.price * item.quantity).toLocaleString()}</p>
                   </div>
@@ -126,12 +195,12 @@ const CheckoutPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Payment Method Section */}
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-              <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <CreditCard size={20} className="text-[#F4898E]" /> Payment Method
+            {/* Payment Method */}
+            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+              <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                <CreditCard size={22} className="text-[#F4898E]" /> Payment Method
               </h2>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <PaymentOption id="cod" label="Cash on Delivery" active={paymentMethod === 'cod'} onClick={() => setPaymentMethod('cod')} />
                 <PaymentOption id="gcash" label="GCash / E-Wallet" active={paymentMethod === 'gcash'} onClick={() => setPaymentMethod('gcash')} />
               </div>
@@ -140,25 +209,24 @@ const CheckoutPage: React.FC = () => {
 
           {/* Checkout Details Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 sticky top-24">
-              <h2 className="text-xl font-bold text-gray-800 mb-6">Payment Details</h2>
+            <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 sticky top-24">
+              <h2 className="text-xl font-bold text-gray-800 mb-8 text-left">Payment Details</h2>
 
-              {/* Promo Code Input Group */}
-              <div className="mb-6">
-                <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-widest">Promo Code</label>
-                <div className="flex border border-gray-300 rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-pink-500 transition-all">
+              <div className="mb-8 text-left">
+                <label className="block text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-[0.2em]">Promo Code</label>
+                <div className="flex border border-gray-300 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-pink-500 transition-all">
                   <input 
                     type="text" 
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value)}
-                    placeholder="Promo Code"
-                    className="flex-1 px-4 py-2 text-sm outline-none bg-transparent"
+                    placeholder="Enter code"
+                    className="flex-1 px-4 py-3 text-sm outline-none bg-transparent"
                   />
                   <button 
                     onClick={handleApplyPromo}
-                    className="bg-[#F4898E] text-white px-6 py-2 text-sm font-bold hover:bg-pink-700 transition-colors cursor-pointer"
+                    className="bg-black text-white px-6 py-2 text-xs font-bold hover:bg-gray-800 transition-colors cursor-pointer"
                   >
-                    Submit
+                    Apply
                   </button>
                 </div>
                 {promoMessage && (
@@ -183,19 +251,23 @@ const CheckoutPage: React.FC = () => {
                   <span className="text-sm">Shipping Total</span>
                   <span className="font-semibold text-gray-800">₱{shipping.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-lg pt-4 border-t border-gray-50">
+                <div className="flex justify-between items-end pt-6 border-t border-gray-50">
                   <span className="font-bold text-gray-800">Total Payment</span>
-                  <span className="font-bold text-pink-600 text-2xl">₱{total.toLocaleString()}</span>
+                  <span className="font-bold text-pink-600 text-3xl">₱{total.toLocaleString()}</span>
                 </div>
               </div>
 
               <button 
                 onClick={handlePlaceOrder}
-                disabled={processing || !address}
-                className="w-full bg-pink-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-pink-700 transition-all shadow-xl shadow-pink-100 disabled:opacity-50 cursor-pointer"
+                disabled={processing || !selectedAddressId}
+                className="w-full bg-pink-600 text-white py-5 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-pink-700 transition-all shadow-xl shadow-pink-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {processing ? <Loader2 className="animate-spin" /> : "Place Order"}
               </button>
+              
+              {!selectedAddressId && (
+                <p className="text-[10px] text-red-400 mt-4 text-center font-bold uppercase tracking-wider">Please select a delivery address</p>
+              )}
             </div>
           </div>
         </div>
@@ -205,10 +277,10 @@ const CheckoutPage: React.FC = () => {
 };
 
 const PaymentOption = ({ label, active, onClick }: any) => (
-  <button onClick={onClick} className={`p-4 border-2 rounded-2xl text-left transition-all cursor-pointer ${active ? 'border-pink-500 bg-pink-50 text-pink-600' : 'border-gray-100 text-gray-500 hover:border-pink-200'}`}>
+  <button onClick={onClick} className={`p-5 border-2 rounded-2xl text-left transition-all cursor-pointer group ${active ? 'border-pink-500 bg-pink-50' : 'border-gray-100 text-gray-500 hover:border-pink-100'}`}>
     <div className="flex justify-between items-center">
-      <span className="font-bold text-sm">{label}</span>
-      {active && <CheckCircle2 size={16} />}
+      <span className={`font-bold text-sm ${active ? 'text-pink-600' : 'text-gray-600'}`}>{label}</span>
+      {active ? <CheckCircle2 size={18} className="text-pink-600" /> : <div className="w-[18px] h-[18px] border-2 border-gray-100 rounded-full group-hover:border-pink-200" />}
     </div>
   </button>
 );

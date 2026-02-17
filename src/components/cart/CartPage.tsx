@@ -239,7 +239,7 @@ const CartPage: React.FC = () => {
                         />
                         <button 
                         onClick={handleApplyPromo}
-                        className="bg-[#F4898E] text-white px-6 py-2 text-sm font-bold hover:bg-pink-700 transition-colors cursor-pointer"
+                        className="bg-black text-white px-6 py-2 text-sm font-bold hover:bg-pink-700 transition-colors cursor-pointer"
                         >
                         Submit
                         </button>
