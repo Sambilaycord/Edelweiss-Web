@@ -10,6 +10,10 @@ const CartPage: React.FC = () => {
   const [selectedItems, setSelectedItems] = useState<string[]>([]); 
   const navigate = useNavigate();
 
+  const [promoCode, setPromoCode] = useState('');
+  const [appliedDiscount, setAppliedDiscount] = useState(0);
+  const [promoMessage, setPromoMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+
   useEffect(() => {
     fetchCart();
   }, []);
@@ -109,10 +113,21 @@ const CartPage: React.FC = () => {
     }
   };
 
+  const handleApplyPromo = () => {
+  // Mock validation logic
+  if (promoCode.toUpperCase() === 'EDELWEISS2026') {
+    setAppliedDiscount(100); // Flat ₱100 off
+    setPromoMessage({ text: 'Promo code applied!', type: 'success' });
+  } else {
+    setAppliedDiscount(0);
+    setPromoMessage({ text: 'Invalid promo code', type: 'error' });
+  }
+};
+
   const selectedCartData = cartItems.filter(item => selectedItems.includes(item.id));
   const subtotal = selectedCartData.reduce((acc, item) => acc + (item.products?.price * item.quantity), 0);
   const shipping = selectedItems.length > 0 ? 50 : 0; 
-  const total = subtotal + shipping;
+  const total = Math.max(0, subtotal + shipping - appliedDiscount);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -125,7 +140,7 @@ const CartPage: React.FC = () => {
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-gray-800 mb-8 flex items-center gap-3 text-left">
-          <ShoppingBag className="text-pink-600" /> Shopping Bag
+          <ShoppingBag className="text-[#F4898E]" /> Shopping Bag
         </h1>
 
         {cartItems.length === 0 ? (
@@ -167,7 +182,7 @@ const CartPage: React.FC = () => {
                       onClick={() => navigate(`/shop/${shopName.toLowerCase().replace(/\s+/g, '-')}`)}
                       className="flex items-center gap-1.5 text-gray-800 hover:text-pink-600 transition-colors group cursor-pointer"
                     >
-                      <Store size={18} className="text-pink-600" />
+                      <Store size={18} className="text-[#F4898E]" />
                       <span className="font-semibold text-sm uppercase tracking-widest">{shopName}</span>
                       <ChevronRight size={16} className="text-gray-400 group-hover:text-pink-600 transition-colors" />
                     </button>
@@ -208,23 +223,56 @@ const CartPage: React.FC = () => {
                 </div>
               ))}
             </div>
-
             <div className="lg:col-span-1">
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 sticky top-24">
                 <h2 className="text-xl font-bold text-gray-800 mb-6 text-left">Order Summary</h2>
                 <div className="space-y-4 mb-6">
-                  <div className="flex justify-between text-gray-500">
-                    <span className="text-sm">Subtotal</span>
-                    <span className="font-semibold text-gray-800">₱{subtotal.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-gray-500 border-b border-gray-50 pb-4">
-                    <span className="text-sm">Shipping Fee</span>
-                    <span className="font-semibold text-gray-800">₱{shipping.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-lg">
-                    <span className="font-bold text-gray-800">Total</span>
-                    <span className="font-bold text-pink-600">₱{total.toLocaleString()}</span>
-                  </div>
+                    <div className="mb-6">
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-widest text-left">Promo Code</label>
+                    <div className="flex border border-gray-300 rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-pink-500 transition-all">
+                        <input 
+                        type="text" 
+                        value={promoCode}
+                        onChange={(e) => setPromoCode(e.target.value)}
+                        placeholder="Promo Code"
+                        className="flex-1 px-4 py-2 text-sm outline-none bg-transparent"
+                        />
+                        <button 
+                        onClick={handleApplyPromo}
+                        className="bg-[#F4898E] text-white px-6 py-2 text-sm font-bold hover:bg-pink-700 transition-colors cursor-pointer"
+                        >
+                        Submit
+                        </button>
+                    </div>
+                    {promoMessage && (
+                        <p className={`text-[10px] mt-2 font-bold ${promoMessage.type === 'success' ? 'text-green-500' : 'text-red-500'}`}>
+                        {promoMessage.text}
+                        </p>
+                    )}
+                    </div>
+                  <div className="space-y-4 mb-6">
+                    <div className="flex justify-between text-gray-500">
+                        <span className="text-sm">Subtotal</span>
+                        <span className="font-semibold text-gray-800">₱{subtotal.toLocaleString()}</span>
+                    </div>
+                    
+                    {/* Discount Row (Conditional) */}
+                    {appliedDiscount > 0 && (
+                        <div className="flex justify-between text-green-600">
+                        <span className="text-sm">Discount</span>
+                        <span className="font-semibold">-₱{appliedDiscount.toLocaleString()}</span>
+                        </div>
+                    )}
+
+                    <div className="flex justify-between text-gray-500 border-b border-gray-50 pb-4">
+                        <span className="text-sm">Shipping Fee</span>
+                        <span className="font-semibold text-gray-800">₱{shipping.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-lg">
+                        <span className="font-bold text-gray-800">Total</span>
+                        <span className="font-bold text-pink-600">₱{total.toLocaleString()}</span>
+                    </div>
+                    </div>
                 </div>
                 <button 
                   onClick={() => navigate('/checkout', { state: { items: selectedCartData } })}
