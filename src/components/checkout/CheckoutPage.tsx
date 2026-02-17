@@ -288,7 +288,7 @@ const CheckoutPage: React.FC = () => {
                       <span className="text-sm">Message Envelope</span>
                       <span className="font-semibold text-gray-800">
                         {addonFee === 0 ? (
-                          <span className="uppercase text-[10px] font-bold text-green-600 tracking-wider">Free</span>
+                          <span className="uppercase text-sm font-bold tracking-wider">Free</span>
                         ) : (
                           `₱${addonFee.toLocaleString()}`
                         )}
