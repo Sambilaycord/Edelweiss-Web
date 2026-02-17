@@ -9,6 +9,7 @@ import PasswordReset from "./components/login/PasswordReset";
 import ProfilePage from "./components/profile/ProfilePage";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import SellerRegistration from './components/profile/SellerRegistration';
+import CartPage from './components/cart/CartPage'; // Imported CartPage
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -29,16 +30,14 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (loading) return null; // Or a nice pink loading spinner
+  if (loading) return null; 
 
   return (
     <Router>
       <AnimatePresence mode="wait">
         <Routes>
-          {/* Public Routes */}
           <Route path="/" element={<HomePage />} />
-
-          {/* Auth-Only Routes (Redirect to Home if already logged in) */}
+          <Route path="/cart" element={<CartPage />} />
           <Route 
             path="/login" 
             element={session ? <Navigate to="/" replace /> : <LoginPage />} 
@@ -47,8 +46,6 @@ function App() {
             path="/password-reset" 
             element={session ? <Navigate to="/" replace /> : <PasswordReset />} 
           />
-
-          {/* Protected Routes (Redirect to Login if not logged in) */}
           <Route 
             path="/profile" 
             element={
@@ -57,7 +54,6 @@ function App() {
               </ProtectedRoute>
             } 
           />
-
           <Route 
             path="/become-a-seller" 
             element={
@@ -66,8 +62,6 @@ function App() {
               </ProtectedRoute>
             } 
           />
-
-          {/* 404 Redirect: Any undefined URL goes to Home */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>
