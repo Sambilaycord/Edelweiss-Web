@@ -45,7 +45,7 @@ function App() {
           />
           <Route 
             path="/password-reset" 
-            element={session ? <Navigate to="/" replace /> : <PasswordReset />} 
+            element={<PasswordReset />} 
           />
 
           {/* Protected Routes (Redirect to Login if not logged in) */}
