@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'; 
-import { AnimatePresence } from 'framer-motion';
+import { RouterProvider, createBrowserRouter, Navigate } from 'react-router-dom';
 import { supabase } from './lib/supabaseClient';
 
 import LoginPage from "./components/login/LoginPage";
@@ -15,13 +14,11 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
@@ -29,50 +26,42 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (loading) return null; // Or a nice pink loading spinner
-
-  return (
-    <Router>
-      <AnimatePresence mode="wait">
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<HomePage />} />
-
-          {/* Auth-Only Routes (Redirect to Home if already logged in) */}
-          <Route 
-            path="/login" 
-            element={session ? <Navigate to="/" replace /> : <LoginPage />} 
-          />
-          <Route 
-            path="/password-reset" 
-            element={<PasswordReset />} 
-          />
-
-          {/* Protected Routes (Redirect to Login if not logged in) */}
-          <Route 
-            path="/profile" 
-            element={
-              <ProtectedRoute>
-                <ProfilePage />
-              </ProtectedRoute>
-            } 
-          />
-
-          <Route 
-            path="/become-a-seller" 
-            element={
-              <ProtectedRoute>
-                <SellerRegistration />
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* 404 Redirect: Any undefined URL goes to Home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AnimatePresence>
-    </Router>
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pink-600" />
+    </div>
   );
+
+  const pendingReset = sessionStorage.getItem('pendingPasswordReset') === 'true';
+
+  const router = createBrowserRouter([
+    // If user has session but hasn't finished resetting, lock entire app to /password-reset
+    ...(session && pendingReset
+      ? [
+          { path: '/password-reset', element: <PasswordReset /> },
+          { path: '*', element: <Navigate to="/password-reset" replace /> },
+        ]
+      : [
+          { path: '/', element: <HomePage /> },
+          {
+            path: '/login',
+            element: session ? <Navigate to="/" replace /> : <LoginPage />,
+          },
+          { path: '/password-reset', element: <PasswordReset /> },
+          {
+            path: '/profile',
+            element: <ProtectedRoute><ProfilePage /></ProtectedRoute>,
+          },
+          {
+            path: '/become-a-seller',
+            element: <ProtectedRoute><SellerRegistration /></ProtectedRoute>,
+          },
+          { path: '*', element: <Navigate to="/" replace /> },
+        ]
+    ),
+  ]);
+
+  return <RouterProvider router={router} />;
 }
 
 export default App;
