@@ -11,6 +11,7 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import SellerRegistration from './components/profile/SellerRegistration';
 import CartPage from './components/cart/CartPage';
 import CheckoutPage from './components/checkout/CheckoutPage';
+import SellerDashboard from './components/dashboard/dashboard';
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -68,6 +69,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <SellerRegistration />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
+                <SellerDashboard />
               </ProtectedRoute>
             } 
           />
