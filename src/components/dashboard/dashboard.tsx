@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabaseClient';
 import Navbar from '../common/Navbar';
+import SettingsTab from './SettingsTab';
+import ProductsTab from './ProductsTab';
 import {
     LayoutDashboard,
     Package,
@@ -26,6 +28,9 @@ interface ShopData {
     name: string;
     description: string;
     business_phone: string;
+    shop_logo_url: string | null;
+    shop_banner_url: string | null;
+    shop_address: string | null;
 }
 
 type DashboardTab = 'overview' | 'products' | 'orders' | 'analytics' | 'settings';
@@ -44,7 +49,7 @@ const SellerDashboard: React.FC = () => {
 
                 const { data, error } = await supabase
                     .from('shops')
-                    .select('id, name, description, business_phone')
+                    .select('id, name, description, business_phone, shop_logo_url, shop_banner_url, shop_address')
                     .eq('owner_id', session.user.id)
                     .single();
 
@@ -117,10 +122,10 @@ const SellerDashboard: React.FC = () => {
                 {/* ===== MAIN CONTENT ===== */}
                 <main className="flex-1 p-8">
                     {activeTab === 'overview' && <OverviewTab shopName={shop?.name || 'My Shop'} />}
-                    {activeTab === 'products' && <ProductsTab />}
+                    {activeTab === 'products' && shop && <ProductsTab shopId={shop.id} />}
                     {activeTab === 'orders' && <PlaceholderTab icon={<ShoppingBag size={48} />} title="Orders" description="Incoming customer orders will appear here." />}
                     {activeTab === 'analytics' && <PlaceholderTab icon={<BarChart3 size={48} />} title="Analytics" description="Sales charts and performance metrics coming soon." />}
-                    {activeTab === 'settings' && <PlaceholderTab icon={<Settings size={48} />} title="Shop Settings" description="Manage your shop information, policies, and preferences." />}
+                    {activeTab === 'settings' && shop && <SettingsTab shop={shop} onShopUpdated={(updated) => setShop(updated)} />}
                 </main>
             </div>
         </motion.div>
@@ -172,34 +177,6 @@ const OverviewTab = ({ shopName }: { shopName: string }) => (
     </div>
 );
 
-/* ===== PRODUCTS TAB ===== */
-const ProductsTab = () => (
-    <div>
-        <div className="flex items-center justify-between mb-6">
-            <div>
-                <h1 className="text-2xl font-bold text-gray-800">Products</h1>
-                <p className="text-gray-500 mt-1">Manage your product listings.</p>
-            </div>
-            <button className="flex items-center gap-2 bg-pink-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-pink-700 transition-all shadow-lg shadow-pink-200 cursor-pointer text-sm">
-                <Plus size={18} /> Add Product
-            </button>
-        </div>
-
-        {/* Empty State */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-16 flex flex-col items-center justify-center text-center">
-            <div className="w-20 h-20 bg-pink-50 rounded-2xl flex items-center justify-center text-pink-400 mb-5">
-                <Package size={40} />
-            </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">No products yet</h3>
-            <p className="text-gray-400 text-sm max-w-sm mb-6">
-                Start building your catalog by adding your first product. Customers will be able to browse and purchase from your shop.
-            </p>
-            <button className="flex items-center gap-2 bg-pink-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-pink-700 transition-all cursor-pointer text-sm">
-                <Plus size={18} /> Add Your First Product
-            </button>
-        </div>
-    </div>
-);
 
 /* ===== PLACEHOLDER TAB ===== */
 const PlaceholderTab = ({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) => (
