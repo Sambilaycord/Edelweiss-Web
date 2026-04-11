@@ -133,7 +133,7 @@ const SellerDashboard: React.FC = () => {
 
                 {/* ===== MAIN CONTENT ===== */}
                 <main className="flex-1 p-8">
-                    {activeTab === 'overview' && <OverviewTab shopName={shop?.name || 'My Shop'} productCount={productCount} onNavigate={(tab, action) => {
+                    {activeTab === 'overview' && <OverviewTab shopName={shop?.name || 'My Shop'} shopId={shop?.id || ''} productCount={productCount} onNavigate={(tab, action) => {
                         if (action) setDashboardAction(action);
                         setActiveTab(tab);
                     }} />}
@@ -148,7 +148,7 @@ const SellerDashboard: React.FC = () => {
 };
 
 /* ===== OVERVIEW TAB ===== */
-const OverviewTab = ({ shopName, productCount, onNavigate }: { shopName: string; productCount: number; onNavigate: (tab: DashboardTab, action?: string) => void }) => (
+const OverviewTab = ({ shopName, shopId, productCount, onNavigate }: { shopName: string; shopId: string; productCount: number; onNavigate: (tab: DashboardTab, action?: string) => void }) => (
     <div>
         {/* Welcome Header */}
         <div className="mb-8">
@@ -171,7 +171,7 @@ const OverviewTab = ({ shopName, productCount, onNavigate }: { shopName: string;
                 <h3 className="font-bold text-gray-800 mb-4">Quick Actions</h3>
                 <div className="space-y-3">
                     <QuickAction icon={<Plus size={18} />} label="Add New Product" description="List a product in your shop" onClick={() => onNavigate('products', 'add_product')} />
-                    <QuickAction icon={<Eye size={18} />} label="View My Shop" description="See how customers see it" />
+                    <QuickAction icon={<Eye size={18} />} label="View My Shop" description="See how customers see it" onClick={() => { if (shopId) window.open(`/shop/${shopId}`, '_blank'); }} />
                     <QuickAction icon={<Edit size={18} />} label="Edit Shop Info" description="Update name, description, etc." onClick={() => onNavigate('settings')} />
                 </div>
             </div>

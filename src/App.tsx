@@ -12,6 +12,7 @@ import SellerRegistration from './components/profile/SellerRegistration';
 import CartPage from './components/cart/CartPage';
 import CheckoutPage from './components/checkout/CheckoutPage';
 import SellerDashboard from './components/dashboard/dashboard';
+import ShopPage from './components/shop/ShopPage';
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -39,6 +40,7 @@ function App() {
       <AnimatePresence mode="wait">
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/shop/:shopId" element={<ShopPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route 
             path="/checkout" 
