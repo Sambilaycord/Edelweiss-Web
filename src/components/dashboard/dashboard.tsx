@@ -40,6 +40,16 @@ const SellerDashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [shop, setShop] = useState<ShopData | null>(null);
     const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
+    const [productCount, setProductCount] = useState(0);
+
+    // Fetch product count for a given shop
+    const fetchProductCount = async (shopId: string) => {
+        const { count } = await supabase
+            .from('products')
+            .select('*', { count: 'exact', head: true })
+            .eq('shop_id', shopId);
+        setProductCount(count || 0);
+    };
 
     useEffect(() => {
         const fetchShop = async () => {
@@ -58,6 +68,7 @@ const SellerDashboard: React.FC = () => {
                     return;
                 }
                 setShop(data);
+                fetchProductCount(data.id);
             } catch (err) {
                 console.error(err);
             } finally {
@@ -98,8 +109,8 @@ const SellerDashboard: React.FC = () => {
                     {/* Navigation */}
                     <nav className="flex-1 p-3 space-y-1">
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Menu</p>
-                        <NavItem icon={<LayoutDashboard size={18} />} label="Overview" isActive={activeTab === 'overview'} onClick={() => setActiveTab('overview')} />
-                        <NavItem icon={<Package size={18} />} label="Products" isActive={activeTab === 'products'} onClick={() => setActiveTab('products')} badge="0" />
+                        <NavItem icon={<LayoutDashboard size={18} />} label="Overview" isActive={activeTab === 'overview'} onClick={() => { setActiveTab('overview'); if (shop) fetchProductCount(shop.id); }} />
+                        <NavItem icon={<Package size={18} />} label="Products" isActive={activeTab === 'products'} onClick={() => setActiveTab('products')} badge={String(productCount)} />
                         <NavItem icon={<ShoppingBag size={18} />} label="Orders" isActive={activeTab === 'orders'} onClick={() => setActiveTab('orders')} />
                         <NavItem icon={<BarChart3 size={18} />} label="Analytics" isActive={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} />
 
@@ -121,7 +132,7 @@ const SellerDashboard: React.FC = () => {
 
                 {/* ===== MAIN CONTENT ===== */}
                 <main className="flex-1 p-8">
-                    {activeTab === 'overview' && <OverviewTab shopName={shop?.name || 'My Shop'} />}
+                    {activeTab === 'overview' && <OverviewTab shopName={shop?.name || 'My Shop'} productCount={productCount} />}
                     {activeTab === 'products' && shop && <ProductsTab shopId={shop.id} />}
                     {activeTab === 'orders' && <PlaceholderTab icon={<ShoppingBag size={48} />} title="Orders" description="Incoming customer orders will appear here." />}
                     {activeTab === 'analytics' && <PlaceholderTab icon={<BarChart3 size={48} />} title="Analytics" description="Sales charts and performance metrics coming soon." />}
@@ -133,7 +144,7 @@ const SellerDashboard: React.FC = () => {
 };
 
 /* ===== OVERVIEW TAB ===== */
-const OverviewTab = ({ shopName }: { shopName: string }) => (
+const OverviewTab = ({ shopName, productCount }: { shopName: string; productCount: number }) => (
     <div>
         {/* Welcome Header */}
         <div className="mb-8">
@@ -143,7 +154,7 @@ const OverviewTab = ({ shopName }: { shopName: string }) => (
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-            <StatCard title="Total Products" value="0" icon={<Package size={22} />} color="pink" subtitle="Add your first product" />
+            <StatCard title="Total Products" value={String(productCount)} icon={<Package size={22} />} color="pink" subtitle={productCount === 0 ? 'Add your first product' : `${productCount} product${productCount !== 1 ? 's' : ''} listed`} />
             <StatCard title="Total Orders" value="0" icon={<ShoppingBag size={22} />} color="blue" subtitle="No orders yet" />
             <StatCard title="Revenue" value="₱0.00" icon={<DollarSign size={22} />} color="green" subtitle="Start selling to earn" />
             <StatCard title="Pending" value="0" icon={<Clock size={22} />} color="amber" subtitle="No pending items" />

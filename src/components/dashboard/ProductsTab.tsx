@@ -20,6 +20,17 @@ import {
 } from 'lucide-react';
 
 /* ===== TYPES ===== */
+interface ProductVariant {
+    id: string;
+    product_id: string;
+    name: string;
+    price: number;
+    stock: number;
+    sku?: string;
+    is_active: boolean;
+    created_at?: string;
+}
+
 interface Product {
     id: string;
     name: string;
@@ -30,6 +41,7 @@ interface Product {
     is_active: boolean;
     shop_id: string;
     created_at?: string;
+    product_variants?: ProductVariant[];
 }
 
 interface ProductsTabProps {
@@ -65,7 +77,7 @@ const ProductsTab: React.FC<ProductsTabProps> = ({ shopId }) => {
         setLoading(true);
         const { data, error } = await supabase
             .from('products')
-            .select('*')
+            .select('*, product_variants(*)')
             .eq('shop_id', shopId)
             .order('created_at', { ascending: false });
 
@@ -292,9 +304,14 @@ const ProductCard = ({ product, onEdit, onDelete, onToggleActive }: {
             <h4 className="font-semibold text-gray-800 text-sm truncate">{product.name}</h4>
             <p className="text-xs text-gray-400 mt-0.5 truncate">{product.description || 'No description'}</p>
             <div className="flex items-center justify-between mt-3">
-                <span className="text-pink-600 font-bold text-sm">₱{Number(product.price).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+                <span className="text-pink-600 font-bold text-sm">
+                    {product.product_variants && product.product_variants.length > 0 && <span className="text-gray-400 font-normal text-xs mr-1">from</span>}
+                    ₱{Number(product.price).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                </span>
                 <span className={`text-xs font-medium ${product.stock > 0 ? 'text-gray-500' : 'text-red-500'}`}>
-                    {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
+                    {product.product_variants && product.product_variants.length > 0 
+                        ? `${product.stock} total` 
+                        : (product.stock > 0 ? `${product.stock} in stock` : 'Out of stock')}
                 </span>
             </div>
         </div>
@@ -317,6 +334,12 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
     const [stock, setStock] = useState(product?.stock?.toString() || '');
     const [isActive, setIsActive] = useState(product?.is_active ?? true);
     const [saving, setSaving] = useState(false);
+
+    // Variants State
+    const [hasVariants, setHasVariants] = useState(!!product?.product_variants?.length);
+    const [variants, setVariants] = useState<Partial<ProductVariant>[]>(
+        product?.product_variants?.length ? [...product.product_variants].sort((a,b) => a.price - b.price) : []
+    );
 
     // Image management
     const [existingImages, setExistingImages] = useState<string[]>(product?.image_urls || []);
@@ -365,9 +388,20 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
     };
 
     const handleSave = async () => {
+        const isUsingVariants = hasVariants && variants.length > 0;
+
         if (!name.trim()) { showToast('error', 'Product name is required.'); return; }
-        if (!price || parseFloat(price) < 0) { showToast('error', 'Enter a valid price.'); return; }
-        if (!stock || parseInt(stock) < 0) { showToast('error', 'Enter a valid stock quantity.'); return; }
+        if (!isUsingVariants && (!price || parseFloat(price) < 0)) { showToast('error', 'Enter a valid base price.'); return; }
+        if (!isUsingVariants && (!stock || parseInt(stock) < 0)) { showToast('error', 'Enter a valid base stock quantity.'); return; }
+
+        if (isUsingVariants) {
+            for (let i = 0; i < variants.length; i++) {
+                const v = variants[i];
+                if (!v.name?.trim()) { showToast('error', `Variant ${i + 1} needs a name.`); return; }
+                if (v.price === undefined || v.price < 0) { showToast('error', `Variant ${i + 1} needs a valid price.`); return; }
+                if (v.stock === undefined || v.stock < 0) { showToast('error', `Variant ${i + 1} needs a valid stock.`); return; }
+            }
+        }
 
         setSaving(true);
 
@@ -393,15 +427,25 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
 
             const finalImageUrls = [...existingImages, ...uploadedUrls];
 
+            const computedPrice = isUsingVariants 
+                ? Math.min(...variants.map(v => v.price || 0)) 
+                : parseFloat(price);
+            
+            const computedStock = isUsingVariants
+                ? variants.reduce((acc, v) => acc + (v.stock || 0), 0)
+                : parseInt(stock);
+
             const productData = {
                 name: name.trim(),
                 description: description.trim(),
-                price: parseFloat(price),
-                stock: parseInt(stock),
+                price: computedPrice,
+                stock: computedStock,
                 image_urls: finalImageUrls,
                 is_active: isActive,
                 shop_id: shopId,
             };
+
+            let savedProductId = isEditing && product ? product.id : null;
 
             if (isEditing && product) {
                 const { error } = await supabase
@@ -410,10 +454,57 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
                     .eq('id', product.id);
                 if (error) throw error;
             } else {
-                const { error } = await supabase
+                const { data: newProd, error } = await supabase
                     .from('products')
-                    .insert([productData]);
+                    .insert([productData])
+                    .select()
+                    .single();
                 if (error) throw error;
+                savedProductId = newProd.id;
+            }
+
+            // Sync variants
+            if (savedProductId) {
+                if (isUsingVariants) {
+                    // Find deleted variants
+                    if (isEditing && product?.product_variants) {
+                        const currentVariantIds = variants.map(v => v.id).filter(Boolean);
+                        const deletedVariants = product.product_variants.filter(v => !currentVariantIds.includes(v.id));
+                        if (deletedVariants.length > 0) {
+                            await supabase.from('product_variants').delete().in('id', deletedVariants.map(v => v.id));
+                        }
+                    }
+
+                    // Upsert variants
+                    const variantsToUpsert = variants.map(v => ({
+                        id: v.id || undefined,
+                        product_id: savedProductId,
+                        name: v.name,
+                        price: v.price,
+                        stock: v.stock,
+                        sku: v.sku,
+                        is_active: v.is_active ?? true,
+                    }));
+
+                    const newVariants = variantsToUpsert.filter(v => !v.id).map(({id, ...rest}) => rest);
+                    const updateVariants = variantsToUpsert.filter(v => v.id);
+
+                    if (newVariants.length > 0) {
+                        const { error: insertError } = await supabase.from('product_variants').insert(newVariants);
+                        if (insertError) throw insertError;
+                    }
+
+                    for (const v of updateVariants) {
+                        const { id, ...rest } = v;
+                        const { error: updateError } = await supabase.from('product_variants').update(rest).eq('id', id);
+                        if (updateError) throw updateError;
+                    }
+                } else {
+                    // Variants disabled, wipe them out
+                    if (isEditing) {
+                        await supabase.from('product_variants').delete().eq('product_id', savedProductId);
+                    }
+                }
             }
 
             onSaved();
@@ -458,36 +549,128 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
                                 />
                             </div>
 
-                            {/* Price & Stock */}
+                            {/* Active Toggle & Has Variants Toggle */}
                             <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                                        Price (₱) <span className="text-red-400">*</span>
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={price}
-                                        onChange={(e) => setPrice(e.target.value)}
-                                        placeholder="0.00"
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none text-sm"
-                                    />
+                                <div className="flex items-center justify-between bg-gray-50 px-4 py-3 rounded-xl border border-gray-100">
+                                    <div className="mr-2">
+                                        <p className="text-sm font-semibold text-gray-700 leading-tight">Active</p>
+                                    </div>
+                                    <button onClick={() => setIsActive(!isActive)} className="cursor-pointer">
+                                        {isActive ? <ToggleRight size={28} className="text-pink-600" /> : <ToggleLeft size={28} className="text-gray-300" />}
+                                    </button>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                                        Stock <span className="text-red-400">*</span>
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        value={stock}
-                                        onChange={(e) => setStock(e.target.value)}
-                                        placeholder="0"
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none text-sm"
-                                    />
+                                <div className="flex items-center justify-between bg-gray-50 px-4 py-3 rounded-xl border border-gray-100">
+                                    <div className="mr-2">
+                                        <p className="text-sm font-semibold text-gray-700 leading-tight">Has Variants</p>
+                                    </div>
+                                    <button onClick={() => {
+                                        setHasVariants(!hasVariants);
+                                        if (!hasVariants && variants.length === 0) {
+                                            setVariants([{ name: '', price: price ? parseFloat(price) : 0, stock: stock ? parseInt(stock) : 0 }]);
+                                        }
+                                    }} className="cursor-pointer">
+                                        {hasVariants ? <ToggleRight size={28} className="text-pink-600" /> : <ToggleLeft size={28} className="text-gray-300" />}
+                                    </button>
                                 </div>
                             </div>
+
+                            {/* Price & Stock OR Variants List */}
+                            {!hasVariants ? (
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                            Price (₱) <span className="text-red-400">*</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={price}
+                                            onChange={(e) => setPrice(e.target.value)}
+                                            placeholder="0.00"
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                            Stock <span className="text-red-400">*</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={stock}
+                                            onChange={(e) => setStock(e.target.value)}
+                                            placeholder="0"
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none text-sm"
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-3 bg-pink-50/50 p-4 rounded-xl border border-pink-100">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-sm font-semibold text-gray-700">Product Variants</label>
+                                        <button 
+                                            onClick={() => setVariants([...variants, { name: '', price: 0, stock: 0 }])}
+                                            className="text-xs text-pink-600 font-bold flex items-center gap-1 hover:text-pink-700"
+                                        >
+                                            <Plus size={14} /> Add Variant
+                                        </button>
+                                    </div>
+                                    
+                                    {variants.map((variant, index) => (
+                                        <div key={index} className="flex gap-2 items-start bg-white p-3 rounded-lg shadow-sm border border-gray-100 relative group">
+                                            <div className="flex-1 space-y-2">
+                                                <input
+                                                    type="text"
+                                                    value={variant.name || ''}
+                                                    onChange={(e) => {
+                                                        const newVariants = [...variants];
+                                                        newVariants[index].name = e.target.value;
+                                                        setVariants(newVariants);
+                                                    }}
+                                                    placeholder="Variant Name (e.g. Small, Red)"
+                                                    className="w-full px-3 py-2 border border-gray-200 rounded-md focus:ring-1 focus:ring-pink-500 outline-none text-xs"
+                                                />
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="number"
+                                                        value={variant.price === undefined ? '' : variant.price}
+                                                        onChange={(e) => {
+                                                            const newVariants = [...variants];
+                                                            newVariants[index].price = e.target.value ? parseFloat(e.target.value) : undefined;
+                                                            setVariants(newVariants);
+                                                        }}
+                                                        placeholder="Price ₱"
+                                                        className="w-1/2 px-3 py-2 border border-gray-200 rounded-md focus:ring-1 focus:ring-pink-500 outline-none text-xs"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        value={variant.stock === undefined ? '' : variant.stock}
+                                                        onChange={(e) => {
+                                                            const newVariants = [...variants];
+                                                            newVariants[index].stock = e.target.value ? parseInt(e.target.value) : undefined;
+                                                            setVariants(newVariants);
+                                                        }}
+                                                        placeholder="Stock"
+                                                        className="w-1/2 px-3 py-2 border border-gray-200 rounded-md focus:ring-1 focus:ring-pink-500 outline-none text-xs"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <button 
+                                                onClick={() => setVariants(variants.filter((_, i) => i !== index))}
+                                                className="text-gray-300 hover:text-red-500 mt-2 p-1"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {variants.length === 0 && (
+                                        <p className="text-xs text-gray-400 italic text-center py-2">No variants added yet.</p>
+                                    )}
+                                </div>
+                            )}
+
+
 
                             {/* Description */}
                             <div>
@@ -499,24 +682,6 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
                                     placeholder="Describe your product..."
                                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none resize-none text-sm"
                                 />
-                            </div>
-
-                            {/* Active Toggle */}
-                            <div className="flex items-center justify-between bg-gray-50 px-4 py-3 rounded-xl border border-gray-100">
-                                <div>
-                                    <p className="text-sm font-semibold text-gray-700">Active Listing</p>
-                                    <p className="text-xs text-gray-400">Visible to customers when active.</p>
-                                </div>
-                                <button
-                                    onClick={() => setIsActive(!isActive)}
-                                    className="cursor-pointer"
-                                >
-                                    {isActive ? (
-                                        <ToggleRight size={32} className="text-pink-600" />
-                                    ) : (
-                                        <ToggleLeft size={32} className="text-gray-300" />
-                                    )}
-                                </button>
                             </div>
                         </div>
 
