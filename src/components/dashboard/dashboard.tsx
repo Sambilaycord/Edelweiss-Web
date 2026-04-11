@@ -40,6 +40,7 @@ const SellerDashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [shop, setShop] = useState<ShopData | null>(null);
     const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
+    const [dashboardAction, setDashboardAction] = useState<string | null>(null);
     const [productCount, setProductCount] = useState(0);
 
     // Fetch product count for a given shop
@@ -132,8 +133,11 @@ const SellerDashboard: React.FC = () => {
 
                 {/* ===== MAIN CONTENT ===== */}
                 <main className="flex-1 p-8">
-                    {activeTab === 'overview' && <OverviewTab shopName={shop?.name || 'My Shop'} productCount={productCount} />}
-                    {activeTab === 'products' && shop && <ProductsTab shopId={shop.id} />}
+                    {activeTab === 'overview' && <OverviewTab shopName={shop?.name || 'My Shop'} productCount={productCount} onNavigate={(tab, action) => {
+                        if (action) setDashboardAction(action);
+                        setActiveTab(tab);
+                    }} />}
+                    {activeTab === 'products' && shop && <ProductsTab shopId={shop.id} initialAction={dashboardAction} onClearAction={() => setDashboardAction(null)} />}
                     {activeTab === 'orders' && <PlaceholderTab icon={<ShoppingBag size={48} />} title="Orders" description="Incoming customer orders will appear here." />}
                     {activeTab === 'analytics' && <PlaceholderTab icon={<BarChart3 size={48} />} title="Analytics" description="Sales charts and performance metrics coming soon." />}
                     {activeTab === 'settings' && shop && <SettingsTab shop={shop} onShopUpdated={(updated) => setShop(updated)} />}
@@ -144,7 +148,7 @@ const SellerDashboard: React.FC = () => {
 };
 
 /* ===== OVERVIEW TAB ===== */
-const OverviewTab = ({ shopName, productCount }: { shopName: string; productCount: number }) => (
+const OverviewTab = ({ shopName, productCount, onNavigate }: { shopName: string; productCount: number; onNavigate: (tab: DashboardTab, action?: string) => void }) => (
     <div>
         {/* Welcome Header */}
         <div className="mb-8">
@@ -166,9 +170,9 @@ const OverviewTab = ({ shopName, productCount }: { shopName: string; productCoun
             <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 <h3 className="font-bold text-gray-800 mb-4">Quick Actions</h3>
                 <div className="space-y-3">
-                    <QuickAction icon={<Plus size={18} />} label="Add New Product" description="List a product in your shop" />
+                    <QuickAction icon={<Plus size={18} />} label="Add New Product" description="List a product in your shop" onClick={() => onNavigate('products', 'add_product')} />
                     <QuickAction icon={<Eye size={18} />} label="View My Shop" description="See how customers see it" />
-                    <QuickAction icon={<Edit size={18} />} label="Edit Shop Info" description="Update name, description, etc." />
+                    <QuickAction icon={<Edit size={18} />} label="Edit Shop Info" description="Update name, description, etc." onClick={() => onNavigate('settings')} />
                 </div>
             </div>
 
@@ -225,8 +229,8 @@ const StatCard = ({ title, value, icon, color, subtitle }: {
 };
 
 /* ===== QUICK ACTION ===== */
-const QuickAction = ({ icon, label, description }: { icon: React.ReactNode; label: string; description: string }) => (
-    <button className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-pink-50 transition-colors text-left group cursor-pointer border border-gray-100 hover:border-pink-200">
+const QuickAction = ({ icon, label, description, onClick }: { icon: React.ReactNode; label: string; description: string; onClick?: () => void }) => (
+    <button onClick={onClick} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-pink-50 transition-colors text-left group cursor-pointer border border-gray-100 hover:border-pink-200">
         <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-500 group-hover:bg-pink-100 group-hover:text-pink-600 transition-colors flex-shrink-0">
             {icon}
         </div>

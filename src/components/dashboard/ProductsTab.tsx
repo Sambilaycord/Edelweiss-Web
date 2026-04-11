@@ -46,12 +46,14 @@ interface Product {
 
 interface ProductsTabProps {
     shopId: string;
+    initialAction?: string | null;
+    onClearAction?: () => void;
 }
 
 const BUCKET = 'public-media';
 
 /* ===== MAIN COMPONENT ===== */
-const ProductsTab: React.FC<ProductsTabProps> = ({ shopId }) => {
+const ProductsTab: React.FC<ProductsTabProps> = ({ shopId, initialAction, onClearAction }) => {
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -86,6 +88,14 @@ const ProductsTab: React.FC<ProductsTabProps> = ({ shopId }) => {
     }, [shopId]);
 
     useEffect(() => { fetchProducts(); }, [fetchProducts]);
+
+    useEffect(() => {
+        if (initialAction === 'add_product') {
+            setEditingProduct(null);
+            setShowModal(true);
+            onClearAction?.();
+        }
+    }, [initialAction, onClearAction]);
 
     // Toggle active status
     const toggleActive = async (product: Product) => {
