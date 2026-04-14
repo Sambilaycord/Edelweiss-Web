@@ -18,8 +18,8 @@ const CartPage: React.FC = () => {
     fetchCart();
   }, []);
 
-  const fetchCart = async () => {
-    setLoading(true);
+  const fetchCart = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
@@ -60,7 +60,7 @@ const CartPage: React.FC = () => {
     } catch (err) {
       console.error("Error fetching cart:", err);
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
@@ -98,15 +98,28 @@ const CartPage: React.FC = () => {
 
   const updateQuantity = async (id: string, newQty: number) => {
     if (newQty < 1) return;
+    
+    // Optimistic UI Update
+    setCartItems(prev => prev.map(item => item.id === id ? { ...item, quantity: newQty } : item));
+    
+    // Background sync
     const { error } = await supabase.from('cart_items').update({ quantity: newQty }).eq('id', id);
-    if (!error) fetchCart();
+    if (error) {
+      console.error(error);
+      fetchCart(false); // Revert on sync failure
+    }
   };
 
   const removeItem = async (id: string) => {
+    // Optimistic UI Update
+    setCartItems(prev => prev.filter(item => item.id !== id));
+    setSelectedItems(prev => prev.filter(itemId => itemId !== id));
+    
+    // Background sync
     const { error } = await supabase.from('cart_items').delete().eq('id', id);
-    if (!error) {
-      setSelectedItems(prev => prev.filter(itemId => itemId !== id));
-      fetchCart();
+    if (error) {
+      console.error(error);
+      fetchCart(false); // Revert on sync failure
     }
   };
 
