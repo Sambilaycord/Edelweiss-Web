@@ -15,6 +15,8 @@ interface ShopData {
     shop_address: string | null;
     average_rating?: number;
     review_count?: number;
+    owner_id: string;
+    is_vacation?: boolean;
 }
 
 interface Product {
@@ -38,6 +40,7 @@ const ShopPage: React.FC = () => {
     const [shop, setShop] = useState<ShopData | null>(null);
     const [products, setProducts] = useState<Product[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isShopOnline, setIsShopOnline] = useState(false);
 
     useEffect(() => {
         const fetchShopAndProducts = async () => {
@@ -79,6 +82,31 @@ const ShopPage: React.FC = () => {
 
         fetchShopAndProducts();
     }, [shopId, navigate]);
+
+    useEffect(() => {
+        if (!shop?.owner_id) return;
+        const ownerId = shop.owner_id;
+
+        const channel = supabase.channel('global_presence');
+        
+        channel.on('presence', { event: 'sync' }, () => {
+            const newState = channel.presenceState();
+            let online = false;
+            for (const [, presences] of Object.entries(newState)) {
+                for (const p of presences as any[]) {
+                    if (p.user_id === ownerId) {
+                        online = true;
+                        break;
+                    }
+                }
+            }
+            setIsShopOnline(online);
+        }).subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [shop?.owner_id]);
 
     if (loading) {
         return (
@@ -140,8 +168,25 @@ const ShopPage: React.FC = () => {
                         <div className="flex-1 flex flex-col justify-between">
                             <div>
                                 <div className="flex items-center gap-3 mb-4 flex-wrap">
-                                    <h1 className="text-3xl md:text-4xl font-medium text-gray-900">
+                                    <h1 className="text-3xl md:text-4xl font-medium text-gray-900 flex items-center gap-3 flex-wrap">
                                         {shop.name}
+                                        <div className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 rounded-full border border-gray-100 mt-1 md:mt-0">
+                                            {shop.is_vacation ? (
+                                                <>
+                                                    <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+                                                    <span className="text-xs font-bold uppercase tracking-wider text-orange-600">
+                                                        In Vacation
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className={`w-2.5 h-2.5 rounded-full ${isShopOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+                                                    <span className={`text-xs font-bold uppercase tracking-wider ${isShopOnline ? 'text-green-600' : 'text-gray-500'}`}>
+                                                        {isShopOnline ? 'Active' : 'Away'}
+                                                    </span>
+                                                </>
+                                            )}
+                                        </div>
                                     </h1>
                                     {shop.review_count !== undefined && shop.review_count > 0 ? (
                                         <div className="flex items-center gap-1 font-bold text-gray-900 text-lg md:text-xl bg-yellow-50 px-3 py-1 rounded-full border border-yellow-100">
@@ -225,6 +270,7 @@ const ShopPage: React.FC = () => {
 const CustomerProductCard = ({ product }: { product: Product }) => {
     const hasVariants = product.product_variants && product.product_variants.length > 0;
     const isOutOfStock = !hasVariants && product.stock <= 0;
+    const navigate = useNavigate();
 
     return (
         <motion.div
@@ -234,10 +280,7 @@ const CustomerProductCard = ({ product }: { product: Product }) => {
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: 0.2 }}
             className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-xl transition-all cursor-pointer flex flex-col h-full ${isOutOfStock ? 'opacity-70 grayscale-[0.3]' : ''}`}
-            onClick={() => {
-                // Navigate to public product details page (to be implemented)
-                console.log('Navigate to product', product.id);
-            }}
+            onClick={() => navigate(`/product/${product.id}`)}
         >
             {/* Image */}
             <div className="relative aspect-square bg-gray-50 overflow-hidden">

@@ -16,6 +16,7 @@ import {
     Upload,
     Trash2,
     ShieldAlert,
+    Plane,
 } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
@@ -28,6 +29,7 @@ interface ShopData {
     shop_logo_url: string | null;
     shop_banner_url: string | null;
     shop_address: string | null;
+    is_vacation?: boolean;
 }
 
 interface SettingsTabProps {
@@ -45,6 +47,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
     const [description, setDescription] = useState(shop.description || '');
     const [businessPhone, setBusinessPhone] = useState<string | undefined>(shop.business_phone || '');
     const [shopAddress, setShopAddress] = useState(shop.shop_address || '');
+    const [isVacation, setIsVacation] = useState(shop.is_vacation || false);
 
     // Image preview state
     const [logoPreview, setLogoPreview] = useState<string | null>(shop.shop_logo_url || null);
@@ -171,6 +174,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
                     shop_address: shopAddress.trim(),
                     shop_logo_url: logoUrl,
                     shop_banner_url: bannerUrl,
+                    is_vacation: isVacation,
                 })
                 .eq('id', shop.id)
                 .select()
@@ -234,6 +238,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
         description !== (shop.description || '') ||
         businessPhone !== (shop.business_phone || '') ||
         shopAddress !== (shop.shop_address || '') ||
+        isVacation !== (shop.is_vacation || false) ||
         logoFile !== null ||
         bannerFile !== null;
 
@@ -321,6 +326,30 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
                                 <p className="text-xs text-gray-400 mt-1 text-right">
                                     {description.length} / 500
                                 </p>
+                            </div>
+
+                            {/* Vacation Mode */}
+                            <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                                        <Plane size={15} className="text-gray-400" />
+                                        Vacation Mode
+                                    </label>
+                                    <p className="text-xs text-gray-500 mt-1">If enabled, your shop will show as "In Vacation".</p>
+                                </div>
+                                <button
+                                    onClick={() => setIsVacation(!isVacation)}
+                                    title="Toggle Vacation Mode"
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 ${
+                                        isVacation ? 'bg-pink-600' : 'bg-gray-200'
+                                    }`}
+                                >
+                                    <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                            isVacation ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                    />
+                                </button>
                             </div>
                         </div>
                     </div>

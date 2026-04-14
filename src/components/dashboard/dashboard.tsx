@@ -31,6 +31,7 @@ interface ShopData {
     shop_logo_url: string | null;
     shop_banner_url: string | null;
     shop_address: string | null;
+    is_vacation?: boolean;
 }
 
 type DashboardTab = 'overview' | 'products' | 'orders' | 'analytics' | 'settings';
@@ -60,7 +61,7 @@ const SellerDashboard: React.FC = () => {
 
                 const { data, error } = await supabase
                     .from('shops')
-                    .select('id, name, description, business_phone, shop_logo_url, shop_banner_url, shop_address')
+                    .select('id, name, description, business_phone, shop_logo_url, shop_banner_url, shop_address, is_vacation')
                     .eq('owner_id', session.user.id)
                     .single();
 

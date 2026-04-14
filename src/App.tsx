@@ -13,24 +13,57 @@ import CartPage from './components/cart/CartPage';
 import CheckoutPage from './components/checkout/CheckoutPage';
 import SellerDashboard from './components/dashboard/dashboard';
 import ShopPage from './components/shop/ShopPage';
+import ProductPage from './components/product/ProductPage';
 
 function App() {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let presenceChannel: any = null;
+
+    const setupPresence = async (userId: string) => {
+        if (presenceChannel) return;
+        presenceChannel = supabase.channel('global_presence');
+        presenceChannel
+          .on('presence', { event: 'sync' }, () => {})
+          .subscribe(async (status: string) => {
+             if (status === 'SUBSCRIBED') {
+                 await presenceChannel.track({ user_id: userId, online_at: new Date().toISOString() });
+             }
+          });
+    };
+
+    const teardownPresence = async () => {
+        if (presenceChannel) {
+            await supabase.removeChannel(presenceChannel);
+            presenceChannel = null;
+        }
+    };
+
     // Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
+      if (session?.user) {
+        setupPresence(session.user.id);
+      }
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session?.user) {
+        setupPresence(session.user.id);
+      } else {
+        teardownPresence();
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      teardownPresence();
+    };
   }, []);
 
   if (loading) return null; 
@@ -41,6 +74,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/shop/:shopId" element={<ShopPage />} />
+          <Route path="/product/:productId" element={<ProductPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route 
             path="/checkout" 
