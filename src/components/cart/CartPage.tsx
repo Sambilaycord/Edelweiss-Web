@@ -33,33 +33,30 @@ const CartPage: React.FC = () => {
         if (cartData) {
           const { data: items } = await supabase
             .from('cart_items')
-            .select(`id, quantity, product_id, products (name, price, image_url, shop_name)`)
+            .select(`
+                id, 
+                quantity, 
+                product_id, 
+                products (
+                    id, 
+                    name, 
+                    price, 
+                    image_urls,
+                    shops (name)
+                )
+            `)
             .eq('cart_id', cartData.id);
 
-          if (items && items.length > 0) {
-            setCartItems(items);
-            setSelectedItems(items.map(item => item.id));
-            setLoading(false);
-            return;
-          }
+          setCartItems(items || []);
+          setSelectedItems((items || []).map(item => item.id));
+        } else {
+            setCartItems([]);
+            setSelectedItems([]);
         }
+      } else {
+          setCartItems([]);
+          setSelectedItems([]);
       }
-
-      // Mock data for testing
-      const mockItems = [
-        {
-          id: 'mock-1',
-          quantity: 1,
-          products: { name: 'Classic White Edelweiss Tee', price: 899, image_url: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200', shop_name: 'Edelweiss Official' }
-        },
-        {
-          id: 'mock-2',
-          quantity: 2,
-          products: { name: 'Pink Linen Shorts', price: 1200, image_url: 'https://images.unsplash.com/photo-1591195853828-11db59a44f6b?w=200', shop_name: 'Summer Bloom' }
-        }
-      ];
-      setCartItems(mockItems);
-      setSelectedItems(mockItems.map(m => m.id));
     } catch (err) {
       console.error("Error fetching cart:", err);
     } finally {
@@ -68,7 +65,7 @@ const CartPage: React.FC = () => {
   };
 
   const groupedItems = cartItems.reduce((acc: any, item) => {
-    const shop = item.products?.shop_name || "Unknown Shop";
+    const shop = item.products?.shops?.name || "Unknown Shop";
     if (!acc[shop]) acc[shop] = [];
     acc[shop].push(item);
     return acc;
@@ -199,7 +196,7 @@ const CartPage: React.FC = () => {
                           className="w-5 h-5 accent-pink-600 rounded cursor-pointer"
                         />
                         <img
-                          src={item.products?.image_url}
+                          src={item.products?.image_urls?.[0]}
                           className="w-24 h-24 object-cover rounded-xl border border-gray-100"
                           alt={item.products?.name}
                         />
