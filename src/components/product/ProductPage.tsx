@@ -248,6 +248,7 @@ const ProductPage: React.FC = () => {
                 .select('id, quantity')
                 .eq('cart_id', cartId)
                 .eq('product_id', product.id)
+                .eq('variant_id', selectedVariant?.id || null)
                 .maybeSingle();
 
             if (existingItem) {
@@ -267,8 +268,8 @@ const ProductPage: React.FC = () => {
                     .insert({
                         cart_id: cartId,
                         product_id: product.id,
-                        quantity: quantity
-                        // variant_id: selectedVariant?.id // Add this if backend mapping is supported later
+                        quantity: quantity,
+                        variant_id: selectedVariant?.id || null
                     });
 
                 if (insertError) throw insertError;

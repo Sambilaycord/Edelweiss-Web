@@ -8,6 +8,7 @@ const CartPage: React.FC = () => {
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const [promoCode, setPromoCode] = useState('');
@@ -37,12 +38,19 @@ const CartPage: React.FC = () => {
                 id, 
                 quantity, 
                 product_id, 
+                variant_id,
                 products (
                     id, 
                     name, 
                     price, 
                     image_urls,
-                    shops (name)
+                    shops (id, name),
+                    product_variants (id, name, price, stock)
+                ),
+                product_variants (
+                    id,
+                    name,
+                    price
                 )
             `)
             .eq('cart_id', cartData.id);
@@ -50,12 +58,12 @@ const CartPage: React.FC = () => {
           setCartItems(items || []);
           setSelectedItems((items || []).map(item => item.id));
         } else {
-            setCartItems([]);
-            setSelectedItems([]);
-        }
-      } else {
           setCartItems([]);
           setSelectedItems([]);
+        }
+      } else {
+        setCartItems([]);
+        setSelectedItems([]);
       }
     } catch (err) {
       console.error("Error fetching cart:", err);
@@ -65,9 +73,10 @@ const CartPage: React.FC = () => {
   };
 
   const groupedItems = cartItems.reduce((acc: any, item) => {
-    const shop = item.products?.shops?.name || "Unknown Shop";
-    if (!acc[shop]) acc[shop] = [];
-    acc[shop].push(item);
+    const shopId = item.products?.shops?.id || "unknown";
+    const shopName = item.products?.shops?.name || "Unknown Shop";
+    if (!acc[shopId]) acc[shopId] = { name: shopName, items: [] };
+    acc[shopId].items.push(item);
     return acc;
   }, {});
 
@@ -85,8 +94,8 @@ const CartPage: React.FC = () => {
     }
   };
 
-  const toggleShopSelection = (shopName: string) => {
-    const shopItemIds = groupedItems[shopName].map((i: any) => i.id);
+  const toggleShopSelection = (shopId: string) => {
+    const shopItemIds = groupedItems[shopId].items.map((i: any) => i.id);
     const allShopSelected = shopItemIds.every((id: string) => selectedItems.includes(id));
 
     if (allShopSelected) {
@@ -98,10 +107,10 @@ const CartPage: React.FC = () => {
 
   const updateQuantity = async (id: string, newQty: number) => {
     if (newQty < 1) return;
-    
+
     // Optimistic UI Update
     setCartItems(prev => prev.map(item => item.id === id ? { ...item, quantity: newQty } : item));
-    
+
     // Background sync
     const { error } = await supabase.from('cart_items').update({ quantity: newQty }).eq('id', id);
     if (error) {
@@ -114,13 +123,43 @@ const CartPage: React.FC = () => {
     // Optimistic UI Update
     setCartItems(prev => prev.filter(item => item.id !== id));
     setSelectedItems(prev => prev.filter(itemId => itemId !== id));
-    
+
     // Background sync
     const { error } = await supabase.from('cart_items').delete().eq('id', id);
     if (error) {
       console.error(error);
       fetchCart(false); // Revert on sync failure
     }
+  };
+
+  const handleUpdateVariant = async (itemId: string, newVariantId: string) => {
+    const item = cartItems.find(i => i.id === itemId);
+    if (!item) return;
+
+    // Check if another item with the same product and NEW variant already exists
+    const existingMatch = cartItems.find(i =>
+      i.product_id === item.product_id &&
+      i.variant_id === newVariantId &&
+      i.id !== itemId
+    );
+
+    if (existingMatch) {
+      // Merge: Update existing item quantity and delete current item
+      const { error: updateError } = await supabase
+        .from('cart_items')
+        .update({ quantity: existingMatch.quantity + item.quantity })
+        .eq('id', existingMatch.id);
+
+      if (!updateError) {
+        await supabase.from('cart_items').delete().eq('id', itemId);
+      }
+    } else {
+      // Simple update
+      await supabase.from('cart_items').update({ variant_id: newVariantId }).eq('id', itemId);
+    }
+
+    setEditingItemId(null);
+    fetchCart(false);
   };
 
   const handleApplyPromo = () => {
@@ -135,7 +174,10 @@ const CartPage: React.FC = () => {
   };
 
   const selectedCartData = cartItems.filter(item => selectedItems.includes(item.id));
-  const subtotal = selectedCartData.reduce((acc, item) => acc + (item.products?.price * item.quantity), 0);
+  const subtotal = selectedCartData.reduce((acc, item) => {
+    const itemPrice = item.product_variants?.price ?? item.products?.price ?? 0;
+    return acc + (itemPrice * item.quantity);
+  }, 0);
   const shipping = selectedItems.length > 0 ? 50 : 0;
   const total = Math.max(0, subtotal + shipping - appliedDiscount);
 
@@ -177,30 +219,30 @@ const CartPage: React.FC = () => {
               </div>
 
               {/* Grouped Shop Containers */}
-              {Object.keys(groupedItems).map((shopName) => (
-                <div key={shopName} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              {Object.entries(groupedItems).map(([shopId, shopData]: [string, any]) => (
+                <div key={shopId} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
 
                   {/* Shop Header Section */}
                   <div className=" px-5 py-4 border-b border-gray-100 flex items-center gap-3">
                     <input
                       type="checkbox"
-                      checked={groupedItems[shopName].every((item: any) => selectedItems.includes(item.id))}
-                      onChange={() => toggleShopSelection(shopName)}
+                      checked={shopData.items.every((item: any) => selectedItems.includes(item.id))}
+                      onChange={() => toggleShopSelection(shopId)}
                       className="w-5 h-5 accent-pink-600 rounded cursor-pointer"
                     />
                     <button
-                      onClick={() => navigate(`/shop/${shopName.toLowerCase().replace(/\s+/g, '-')}`)}
+                      onClick={() => navigate(`/shop/${shopId}`)}
                       className="flex items-center gap-1.5 text-gray-800 hover:text-pink-600 transition-colors group cursor-pointer"
                     >
                       <Store size={18} className="text-[#F4898E]" />
-                      <span className="font-semibold text-sm uppercase tracking-widest">{shopName}</span>
+                      <span className="font-semibold text-sm uppercase tracking-widest">{shopData.name}</span>
                       <ChevronRight size={16} className="text-gray-400 group-hover:text-pink-600 transition-colors" />
                     </button>
                   </div>
 
                   {/* Product List with Internal Dividers */}
                   <div className="divide-y divide-gray-50">
-                    {groupedItems[shopName].map((item: any) => (
+                    {shopData.items.map((item: any) => (
                       <div key={item.id} className="p-5 flex gap-5 items-center transition-colors hover:bg-gray-50/30">
                         <input
                           type="checkbox"
@@ -214,8 +256,55 @@ const CartPage: React.FC = () => {
                           alt={item.products?.name}
                         />
                         <div className="flex-1 text-left">
-                          <h3 className="text-gray-800 text-base mb-1">{item.products?.name}</h3>
-                          <p className="text-pink-600 font-semibold text-lg">₱{item.products?.price.toLocaleString()}</p>
+                          <div className="flex justify-between items-start mb-1">
+                            <h3 
+                              onClick={() => navigate(`/product/${item.product_id}`)}
+                              className="text-gray-800 text-base font-semibold hover:text-pink-600 cursor-pointer transition-colors"
+                            >
+                              {item.products?.name}
+                            </h3>
+                            <p className="text-pink-600 font-medium text-lg">
+                              ₱{((item.product_variants?.price ?? item.products?.price ?? 0) * item.quantity).toLocaleString()}
+                            </p>
+                          </div>
+
+                          {editingItemId === item.id ? (
+                            <div className="mb-2 mt-2">
+                              <label className="text-[10px] font-medium text-gray-400 uppercase tracking-widest block mb-1">Select Variant</label>
+                              <div className="flex flex-wrap gap-2">
+                                {item.products?.product_variants?.map((v: any) => (
+                                  <button
+                                    key={v.id}
+                                    onClick={() => handleUpdateVariant(item.id, v.id)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${item.variant_id === v.id
+                                      ? 'bg-pink-600 text-white border-pink-600'
+                                      : 'bg-white text-gray-600 border-gray-200 hover:border-pink-300'
+                                      }`}
+                                  >
+                                    {v.name}
+                                  </button>
+                                ))}
+                                <button
+                                  onClick={() => setEditingItemId(null)}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-gray-400 hover:text-gray-600"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 mb-1">
+                              <p className="text-sm text-gray-500">Variant: </p>
+                              <button
+                                onClick={() => item.products?.product_variants?.length > 0 && setEditingItemId(item.id)}
+                                className={`text-sm text-pink-600 font-medium ${item.products?.product_variants?.length > 0 ? 'underline hover:text-pink-700 cursor-pointer' : 'no-underline cursor-default'}`}
+                              >
+                                {item.product_variants?.name || "Default"}
+                              </button>
+                            </div>
+                          )}
+
+
                           <div className="flex items-center gap-4 mt-3">
                             <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
                               <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-1.5 hover:bg-gray-50 cursor-pointer"><Minus size={14} /></button>

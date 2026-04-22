@@ -10,12 +10,12 @@ const CheckoutPage: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const { items = [], discount: initialDiscount = 0 } = location.state || {};
-  
+
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [addresses, setAddresses] = useState<any[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
-  const [showAllAddresses, setShowAllAddresses] = useState(false); 
+  const [showAllAddresses, setShowAllAddresses] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cod');
 
   // Leave a Message States
@@ -48,7 +48,7 @@ const CheckoutPage: React.FC = () => {
         .select('*')
         .eq('user_id', user.id)
         .order('is_default', { ascending: false });
-      
+
       setAddresses(data || []);
       const defaultAddr = data?.find(a => a.is_default) || data?.[0];
       if (defaultAddr) setSelectedAddressId(defaultAddr.id);
@@ -61,7 +61,7 @@ const CheckoutPage: React.FC = () => {
 
   const handleApplyPromo = () => {
     if (promoCode.toUpperCase() === 'EDELWEISS2026') {
-      setAppliedDiscount(100); 
+      setAppliedDiscount(100);
       setPromoMessage({ text: 'Promo code applied!', type: 'success' });
     } else {
       setAppliedDiscount(0);
@@ -69,9 +69,12 @@ const CheckoutPage: React.FC = () => {
     }
   };
 
-  const subtotal = items.reduce((acc: number, item: any) => acc + (item.products.price * item.quantity), 0);
+  const subtotal = items.reduce((acc: number, item: any) => {
+    const itemPrice = item.product_variants?.price ?? item.products?.price ?? 0;
+    return acc + (itemPrice * item.quantity);
+  }, 0);
   const shipping = 50;
-  
+
   // Logic: Fee only applies if Options are visible AND Envelope is chosen
   const addonFee = (showMessageOptions && messageType === 'envelope') ? 10 : 0;
   const total = Math.max(0, subtotal + shipping + addonFee - appliedDiscount);
@@ -100,21 +103,21 @@ const CheckoutPage: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            
+
             {/* Delivery Address Section */}
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 relative" ref={dropdownRef}>
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                   <MapPin size={22} className="text-[#F4898E]" /> Delivery Address
                 </h2>
-                <button 
+                <button
                   onClick={() => navigate('/profile', { state: { activeTab: 'address' } })}
                   className="text-sm font-semibold text-pink-600 hover:underline flex items-center gap-1 cursor-pointer transition-all"
                 >
                   Manage Addresses <ChevronRight size={14} />
                 </button>
               </div>
-              
+
               {activeAddress ? (
                 <div className="space-y-2">
                   <div className="bg-pink-50/30 border-2 border-pink-500 rounded-2xl p-6 transition-all">
@@ -131,9 +134,9 @@ const CheckoutPage: React.FC = () => {
                   </div>
 
                   <div className="flex justify-end px-1">
-                    <button 
+                    <button
                       onClick={() => setShowAllAddresses(!showAllAddresses)}
-                      className="flex items-center gap-1 text-[10px] mt-2 font-semibold text-pink-600 hover:text-pink-700 uppercase tracking-widest cursor-pointer transition-all"
+                      className="flex items-center gap-1 text-[10px] mt-2 font-semibold text-gray-700 hover:text-gray-900 uppercase cursor-pointer transition-all"
                     >
                       {showAllAddresses ? "Show Less" : "Show More"}
                       {showAllAddresses ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -143,7 +146,7 @@ const CheckoutPage: React.FC = () => {
                   {showAllAddresses && (
                     <div className="grid grid-cols-1 gap-3 mt-4 animate-in slide-in-from-top-2 duration-200">
                       {otherAddresses.map((addr) => (
-                        <button 
+                        <button
                           key={addr.id}
                           onClick={() => {
                             setSelectedAddressId(addr.id);
@@ -175,16 +178,20 @@ const CheckoutPage: React.FC = () => {
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
               <h2 className="text-xl font-bold text-gray-800 mb-6">Order Items</h2>
               <div className="divide-y divide-gray-50">
-                {items.map((item: any) => (
-                  <div key={item.id} className="flex gap-4 py-4 first:pt-0 last:pb-0 items-center">
-                    <img src={item.products.image_url} className="w-16 h-16 object-cover rounded-xl border border-gray-100" alt="" />
-                    <div className="flex-1">
-                      <h4 className="font-bold text-gray-800 text-sm">{item.products.name}</h4>
-                      <p className="text-gray-400 text-xs mt-0.5">Quantity: {item.quantity}</p>
+                {items.map((item: any) => {
+                  const itemPrice = item.product_variants?.price ?? item.products?.price ?? 0;
+                  return (
+                    <div key={item.id} className="flex gap-4 py-4 first:pt-0 last:pb-0 items-center">
+                      <img src={item.products.image_urls?.[0] || item.products.image_url} className="w-20 h-20 object-cover rounded-xl border border-gray-100" alt={item.products.name} />
+                      <div className="flex-1 text-left">
+                        <h4 className="font-bold text-gray-800 text-base">{item.products.name}</h4>
+                        <p className="text-gray-400 text-[12px] mt-1 font-semibold mb-1">Variant: {item.product_variants?.name || "Default"}</p>
+                        <p className="text-gray-400 text-[12px] font-semibold">Quantity: {item.quantity}</p>
+                      </div>
+                      <p className="font-bold text-gray-900 text-base">₱{(itemPrice * item.quantity).toLocaleString()}</p>
                     </div>
-                    <p className="font-bold text-gray-800 text-sm">₱{(item.products.price * item.quantity).toLocaleString()}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -195,14 +202,14 @@ const CheckoutPage: React.FC = () => {
                   <MessageSquare size={22} className="text-[#F4898E]" /> Leave a Message
                 </h2>
                 {!showMessageOptions ? (
-                  <button 
+                  <button
                     onClick={() => setShowMessageOptions(true)}
                     className="flex items-center gap-1 text-sm font-semibold text-pink-600 hover:text-pink-700 cursor-pointer"
                   >
                     Show Options <ChevronDown size={14} />
                   </button>
                 ) : (
-                  <button 
+                  <button
                     onClick={() => {
                       setShowMessageOptions(false);
                       setPersonalMessage(''); // Optional: reset message on cancel
@@ -213,7 +220,7 @@ const CheckoutPage: React.FC = () => {
                   </button>
                 )}
               </div>
-              
+
               {showMessageOptions && (
                 <div className="mt-8 space-y-6 animate-in slide-in-from-top-4 duration-300">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -235,12 +242,18 @@ const CheckoutPage: React.FC = () => {
                       {messageType === 'envelope' && <CheckCircle2 size={18} />}
                     </button>
                   </div>
-                  <textarea 
-                    value={personalMessage}
-                    onChange={(e) => setPersonalMessage(e.target.value)}
-                    placeholder="Write your message here..."
-                    className="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-pink-500 outline-none transition-all resize-none"
-                  />
+                  <div className="relative">
+                    <textarea
+                      value={personalMessage}
+                      onChange={(e) => setPersonalMessage(e.target.value)}
+                      maxLength={100}
+                      placeholder="Write your message here..."
+                      className="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-pink-500 outline-none transition-all resize-none"
+                    />
+                    <div className="absolute bottom-4 right-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      {personalMessage.length}/100
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -264,8 +277,8 @@ const CheckoutPage: React.FC = () => {
                 <div className="mb-6">
                   <label className="block text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-[0.2em]">Promo Code</label>
                   <div className="flex border border-gray-300 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-pink-500 transition-all">
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={promoCode}
                       onChange={(e) => setPromoCode(e.target.value)}
                       placeholder="Enter code"
@@ -281,7 +294,7 @@ const CheckoutPage: React.FC = () => {
                     <span className="text-sm">Merchandise Subtotal</span>
                     <span className="font-semibold text-gray-800">₱{subtotal.toLocaleString()}</span>
                   </div>
-                  
+
                   {/* Conditional Message Envelope Fee */}
                   {showMessageOptions && (
                     <div className="flex justify-between text-gray-500">
@@ -312,7 +325,7 @@ const CheckoutPage: React.FC = () => {
                   </div>
                 </div>
 
-                <button 
+                <button
                   onClick={handlePlaceOrder}
                   disabled={processing || !selectedAddressId}
                   className="w-full bg-pink-600 text-white py-5 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-pink-700 transition-all shadow-xl shadow-pink-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
