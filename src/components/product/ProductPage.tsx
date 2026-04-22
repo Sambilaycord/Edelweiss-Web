@@ -51,12 +51,19 @@ const ProductPage: React.FC = () => {
     const [addingToCart, setAddingToCart] = useState(false);
     const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
     const [isFavorite, setIsFavorite] = useState(false);
+    const [favoriteId, setFavoriteId] = useState<string | null>(null);
     const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
 
     useEffect(() => {
         const fetchProductData = async () => {
             if (!productId) return;
             setLoading(true);
+            setProduct(null);
+            setIsFavorite(false);
+            setFavoriteId(null);
+            setQuantity(1);
+            setSelectedVariant(null);
+            setSelectedImage('');
 
             try {
                 // Fetch product alongside its variants and shop info
@@ -101,6 +108,22 @@ const ProductPage: React.FC = () => {
                     
                 if (!recError && recData) {
                     setRecommendedProducts(recData);
+                }
+
+                // Check Favorite Status
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const { data: favData } = await supabase
+                        .from('user_favorites')
+                        .select('id')
+                        .eq('customer_id', user.id)
+                        .eq('product_id', productId)
+                        .maybeSingle();
+                    
+                    if (favData) {
+                        setIsFavorite(true);
+                        setFavoriteId(favData.id);
+                    }
                 }
 
             } catch (err) {
@@ -289,13 +312,45 @@ const ProductPage: React.FC = () => {
         }
     };
 
-    const handleToggleFavorite = () => {
-        setIsFavorite(!isFavorite);
-        if (!isFavorite) {
-            setMessage({ text: 'Added to favorites!', type: 'success' });
-            setTimeout(() => setMessage(null), 3000);
-        } else {
-            setMessage({ text: 'Removed from favorites', type: 'error' });
+    const handleToggleFavorite = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+
+        try {
+            if (isFavorite && favoriteId) {
+                // Remove
+                const { error } = await supabase
+                    .from('user_favorites')
+                    .delete()
+                    .eq('id', favoriteId);
+                
+                if (error) throw error;
+                setIsFavorite(false);
+                setFavoriteId(null);
+                setMessage({ text: 'Removed from favorites', type: 'error' });
+            } else {
+                // Add
+                const { data, error } = await supabase
+                    .from('user_favorites')
+                    .insert({
+                        customer_id: user.id,
+                        product_id: productId
+                    })
+                    .select('id')
+                    .single();
+                
+                if (error) throw error;
+                setIsFavorite(true);
+                setFavoriteId(data.id);
+                setMessage({ text: 'Added to favorites!', type: 'success' });
+            }
+        } catch (err) {
+            console.error("Wishlist error:", err);
+            setMessage({ text: 'Error updating wishlist', type: 'error' });
+        } finally {
             setTimeout(() => setMessage(null), 3000);
         }
     };

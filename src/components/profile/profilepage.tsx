@@ -8,6 +8,7 @@ import confetti from 'canvas-confetti';
 import PersonalInfoTab from './PersonalInfoTab';
 import SellerOnboardingTab from './SellerOnboardingTab';
 import AddressTab from './AddressTab';
+import WishlistTab from './WishlistTab';
 import { validateField, sanitizeInput } from '../../utils/characterValidation';
 
 import { User, Package, Heart, MapPin, LogOut, Settings, Camera, Loader2, Store } from 'lucide-react';
@@ -222,6 +223,9 @@ const ProfilePage: React.FC = () => {
               )}
               {activeTab === 'address' && (
                 <AddressTab profile={profile} /> // Added profile prop for address pre-filling
+              )}
+              {activeTab === 'wishlist' && (
+                <WishlistTab />
               )}
             </div>
           </main>
