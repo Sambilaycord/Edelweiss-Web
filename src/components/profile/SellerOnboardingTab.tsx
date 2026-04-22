@@ -68,7 +68,10 @@ const SellerOnboardingTab: React.FC<SellerOnboardingProps> = ({ role, profile, o
         <p className="text-gray-500 mb-8 text-center max-w-sm">
           Your shop is active. You can now manage your products and view your orders.
         </p>
-        <button className="bg-pink-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-pink-700 transition-all cursor-pointer">
+        <button 
+          onClick={() => navigate('/dashboard')}
+          className="bg-pink-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-pink-700 transition-all cursor-pointer"
+        >
           Manage My Products
         </button>
       </div>

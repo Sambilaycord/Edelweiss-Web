@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom'; // Added useLocation here
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabaseClient';
 import Navbar from '../common/Navbar';
-import { useLocation } from 'react-router-dom'
 import confetti from 'canvas-confetti';
 
 import PersonalInfoTab from './PersonalInfoTab';
@@ -26,12 +25,25 @@ interface ProfileData {
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation(); // 1. Must be declared before being used in useState
+
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [activeTab, setActiveTab] = useState('profile');
+  
+  // 2. Initialize using the state passed from navigate
+  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'profile');
+  
   const [sessionUser, setSessionUser] = useState<any>(null);
   const [role, setRole] = useState<'customer' | 'shop_owner' | 'admin'>('customer');
-  const location = useLocation();
+
+  // 3. Effect to handle tab switching while the component is already mounted
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+      // Clean up state so it doesn't stay on that tab if the user refreshes manually
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const [profile, setProfile] = useState<ProfileData>({
     username: '',
@@ -78,29 +90,20 @@ const ProfilePage: React.FC = () => {
   }, [navigate]);
 
   useEffect(() => {
-    // Check if we arrived here from a successful registration
     if (location.state?.confetti) {
-      // Fire the confetti!
       const duration = 3 * 1000;
       const animationEnd = Date.now() + duration;
       const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
-
       const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
 
       const interval: any = setInterval(function() {
         const timeLeft = animationEnd - Date.now();
-
-        if (timeLeft <= 0) {
-          return clearInterval(interval);
-        }
-
+        if (timeLeft <= 0) return clearInterval(interval);
         const particleCount = 50 * (timeLeft / duration);
-        // Since Edelweiss is pink-themed, let's use pink and gold!
         confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }, colors: ['#db2777', '#fbcfe8', '#fbbf24'] });
         confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }, colors: ['#db2777', '#fbcfe8', '#fbbf24'] });
       }, 250);
       
-      // Clean up the state so it doesn't fire again on refresh
       window.history.replaceState({}, document.title);
     }
   }, [location]);
@@ -119,21 +122,18 @@ const ProfilePage: React.FC = () => {
     const lastError = validateField('lastName', cleanLast);
 
     if (userError || firstError || lastError) {
-      setMessage({ 
-        text: userError || firstError || lastError || 'Invalid input', 
-        type: 'error' 
-      });
+      setMessage({ text: userError || firstError || lastError || 'Invalid input', type: 'error' });
       setUpdating(false);
-      return; // Exit function
+      return;
     }
 
     try {
       const { error } = await supabase.from('profiles').upsert({
         id: sessionUser.id,
-        first_name: profile.first_name || null,
-        last_name: profile.last_name || null,
+        first_name: cleanFirst,
+        last_name: cleanLast,
         phone_number: profile.phone_number || null,
-        username: profile.username || null,
+        username: cleanUsername,
         avatar_url: profile.avatar_url || null,
         gender: profile.gender || null,
         birthdate: profile.birthdate || null,
@@ -221,7 +221,7 @@ const ProfilePage: React.FC = () => {
                 </div>
               )}
               {activeTab === 'address' && (
-                <AddressTab />
+                <AddressTab profile={profile} /> // Added profile prop for address pre-filling
               )}
             </div>
           </main>
