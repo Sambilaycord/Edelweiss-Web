@@ -11,7 +11,8 @@ import AddressTab from './AddressTab';
 import WishlistTab from './WishlistTab';
 import { validateField, sanitizeInput } from '../../utils/characterValidation';
 
-import { User, Package, Heart, MapPin, LogOut, Settings, Camera, Loader2, Store } from 'lucide-react';
+import { User, Package, Heart, MapPin, LogOut, Settings, Camera, Loader2, Store, Pencil } from 'lucide-react';
+import EditProfileModal from './EditProfileModal';
 
 interface ProfileData {
   username: string | null;
@@ -30,10 +31,11 @@ const ProfilePage: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  
+  const [showEditModal, setShowEditModal] = useState(false);
+
   // 2. Initialize using the state passed from navigate
   const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'profile');
-  
+
   const [sessionUser, setSessionUser] = useState<any>(null);
   const [role, setRole] = useState<'customer' | 'shop_owner' | 'admin'>('customer');
 
@@ -97,14 +99,14 @@ const ProfilePage: React.FC = () => {
       const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
       const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
 
-      const interval: any = setInterval(function() {
+      const interval: any = setInterval(function () {
         const timeLeft = animationEnd - Date.now();
         if (timeLeft <= 0) return clearInterval(interval);
         const particleCount = 50 * (timeLeft / duration);
         confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }, colors: ['#db2777', '#fbcfe8', '#fbbf24'] });
         confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }, colors: ['#db2777', '#fbcfe8', '#fbbf24'] });
       }, 250);
-      
+
       window.history.replaceState({}, document.title);
     }
   }, [location]);
@@ -166,26 +168,30 @@ const ProfilePage: React.FC = () => {
           <aside className="w-full md:w-1/4">
             <div className="bg-white rounded-xl shadow-sm overflow-hidden sticky top-24">
               <div className="p-6 border-b border-gray-100 flex flex-col items-center">
-                <div className="w-24 h-24 bg-pink-100 rounded-full flex items-center justify-center text-pink-600 mb-3 relative overflow-hidden">
+                <div className="w-24 h-24 bg-pink-100 border-1 border-gray-300 rounded-full flex items-center justify-center text-pink-600 relative overflow-hidden mb-3">
                   {profile.avatar_url ? (
                     <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                  ) : ( <User size={48} /> )}
-                  <button className="absolute bottom-0 right-0 bg-pink-600 p-2 rounded-full text-white border-2 border-white cursor-pointer">
-                    <Camera size={14} />
-                  </button>
+                  ) : (<User size={48} />)}
                 </div>
-                <h2 className="font-semibold text-gray-800 text-center">
+                <h2 className="font-semibold text-gray-800 text-center flex items-center justify-center gap-2 group">
                   {profile.username || 'User'}
+                  <button
+                    onClick={() => setShowEditModal(true)}
+                    className="text-gray-400 hover:text-pink-600 transition-colors cursor-pointer"
+                    title="Edit profile"
+                  >
+                    <Pencil size={16} />
+                  </button>
                 </h2>
                 <p className="text-sm text-gray-500">{profile.email}</p>
               </div>
               <nav className="p-2">
-                <SidebarItem icon={<User size={18}/>} label="Personal Info" isActive={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
-                <SidebarItem icon={<Package size={18}/>} label="My Orders" isActive={activeTab === 'orders'} onClick={() => setActiveTab('orders')} />
-                <SidebarItem icon={<Heart size={18}/>} label="Wishlist" isActive={activeTab === 'wishlist'} onClick={() => setActiveTab('wishlist')} />
-                <SidebarItem icon={<MapPin size={18}/>} label="Addresses" isActive={activeTab === 'address'} onClick={() => setActiveTab('address')} />
-                <SidebarItem icon={<Settings size={18}/>} label="Settings" isActive={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
-                <SidebarItem icon={<Store size={18}/>} label={role === 'shop_owner' ? "My Shop" : "Sell on Edelweiss"} isActive={activeTab === 'shop'} onClick={() => setActiveTab('shop')}/>
+                <SidebarItem icon={<User size={18} />} label="Personal Info" isActive={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
+                <SidebarItem icon={<Package size={18} />} label="My Orders" isActive={activeTab === 'orders'} onClick={() => setActiveTab('orders')} />
+                <SidebarItem icon={<Heart size={18} />} label="Wishlist" isActive={activeTab === 'wishlist'} onClick={() => setActiveTab('wishlist')} />
+                <SidebarItem icon={<MapPin size={18} />} label="Addresses" isActive={activeTab === 'address'} onClick={() => setActiveTab('address')} />
+                <SidebarItem icon={<Settings size={18} />} label="Settings" isActive={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+                <SidebarItem icon={<Store size={18} />} label={role === 'shop_owner' ? "My Shop" : "Sell on Edelweiss"} isActive={activeTab === 'shop'} onClick={() => setActiveTab('shop')} />
                 <div className="my-2 border-t border-gray-100"></div>
                 <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-50 rounded-lg text-sm font-medium cursor-pointer">
                   <LogOut size={18} /> Sign Out
@@ -197,7 +203,7 @@ const ProfilePage: React.FC = () => {
           <main className="flex-1">
             <div className="bg-white rounded-xl shadow-sm p-8 min-h-[500px]">
               {activeTab === 'profile' && (
-                <PersonalInfoTab 
+                <PersonalInfoTab
                   profile={profile}
                   setProfile={setProfile}
                   onSave={updateProfile}
@@ -206,9 +212,9 @@ const ProfilePage: React.FC = () => {
                 />
               )}
               {activeTab === 'shop' && (
-                <SellerOnboardingTab 
-                  role={role} 
-                  profile={profile} 
+                <SellerOnboardingTab
+                  role={role}
+                  profile={profile}
                   onSuccess={() => {
                     setRole('shop_owner');
                     setActiveTab('shop');
@@ -231,6 +237,24 @@ const ProfilePage: React.FC = () => {
           </main>
         </div>
       </div>
+      {sessionUser && (
+        <EditProfileModal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          profile={{
+            id: sessionUser.id,
+            username: profile.username,
+            avatar_url: profile.avatar_url
+          }}
+          onSuccess={(newProfile) => {
+            setProfile(prev => ({
+              ...prev,
+              username: newProfile.username,
+              avatar_url: newProfile.avatar_url
+            }));
+          }}
+        />
+      )}
     </motion.div>
   );
 };

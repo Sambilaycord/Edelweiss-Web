@@ -86,7 +86,7 @@ const WishlistTab: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {wishlist.map((item) => (
-          <div key={item.id} className="bg-white border border-gray-100 rounded-2xl p-4 flex gap-4 hover:shadow-md transition-all group relative">
+          <div key={item.id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 flex gap-4 hover:shadow-md transition-all group relative">
             <button
               onClick={() => removeFromWishlist(item.id)}
               className="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors p-1 z-10"
