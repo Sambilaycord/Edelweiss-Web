@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, Plus, Gift, Trash2, Edit2, Clock, Cake, Heart, Sparkles, Loader2, Info, PartyPopper, Flower, GraduationCap, Truck } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
@@ -10,9 +11,17 @@ interface Reminder {
   reminder_date: string;
   description: string;
   icon_name?: string;
+  product_id?: string;
+  products?: {
+    id: string;
+    name: string;
+    image_urls: string[];
+    price: number;
+  };
 }
 
 const RemindersTab: React.FC = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -27,7 +36,7 @@ const RemindersTab: React.FC = () => {
 
       const { data, error } = await supabase
         .from('reminders')
-        .select('*')
+        .select('*, products(id, name, image_urls, price)')
         .eq('customer_id', user.id)
         .order('reminder_date', { ascending: true });
 
@@ -147,6 +156,27 @@ const RemindersTab: React.FC = () => {
                     </p>
                     {reminder.description && (
                       <p className="text-gray-500 text-sm italic pr-4">{reminder.description}</p>
+                    )}
+                    {reminder.products && (
+                      <div 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/product/${reminder.products?.id}`);
+                        }}
+                        className="mt-3 bg-pink-50/50 rounded-xl p-3 border border-pink-100 flex items-center gap-3 cursor-pointer hover:bg-pink-50 transition-colors group/gift"
+                      >
+                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-white shrink-0 shadow-sm">
+                          <img 
+                            src={reminder.products.image_urls?.[0]} 
+                            alt={reminder.products.name} 
+                            className="w-full h-full object-cover group-hover/gift:scale-110 transition-transform"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h5 className="text-gray-900 font-bold truncate text-[13px]">{reminder.products.name}</h5>
+                          <p className="text-pink-600 font-bold text-[11px]">₱{Number(reminder.products.price).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>

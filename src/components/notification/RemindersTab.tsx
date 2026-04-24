@@ -11,6 +11,13 @@ interface ReminderItem {
   daysRemaining: number;
   message: string;
   icon_name?: string;
+  product_id?: string;
+  products?: {
+    id: string;
+    name: string;
+    image_urls: string[];
+    price: number;
+  };
 }
 
 const RemindersTab: React.FC = () => {
@@ -52,7 +59,7 @@ const RemindersTab: React.FC = () => {
 
         const { data, error } = await supabase
           .from('reminders')
-          .select('*')
+          .select('*, products(id, name, image_urls, price)')
           .eq('customer_id', user.id);
 
         if (error) throw error;
@@ -81,18 +88,16 @@ const RemindersTab: React.FC = () => {
 
   const renderIcon = (name: string | undefined, isToday: boolean) => {
     const size = 32;
-    if (isToday) return <PartyPopper className="text-white" size={size} />;
-
-    const className = "text-pink-500";
+    const className = isToday ? "text-white" : "text-pink-500";
 
     switch (name) {
       case 'flower': return <Flower size={size} className={className} />;
       case 'heart': return <Heart size={size} className={className} />;
       case 'cake': return <Cake size={size} className={className} />;
-      case 'party_popper': return <PartyPopper size={size} className={className} />;
+      case 'party-popper': return <PartyPopper size={size} className={className} />;
       case 'gift': return <Gift size={size} className={className} />;
-      case 'sparkles': return <Sparkles size={size} className={className} />;
-      case 'graduation_cap': return <GraduationCap size={size} className={className} />;
+      case 'sparkle': return <Sparkles size={size} className={className} />;
+      case 'graduation-cap': return <GraduationCap size={size} className={className} />;
       case 'truck': return <Truck size={size} className={className} />;
       default: return <Flower size={size} className={className} />;
     }
@@ -186,9 +191,33 @@ const RemindersTab: React.FC = () => {
                         <p className="text-gray-500 text-sm leading-relaxed pr-10 line-clamp-2 font-medium">
                           {reminder.message}
                         </p>
+                        {reminder.products && (
+                          <div 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/product/${reminder.products?.id}`);
+                            }}
+                            className="mt-3 bg-pink-50 rounded-xl p-2 border border-pink-100 flex items-center gap-3 cursor-pointer hover:bg-white transition-colors group/gift max-w-sm"
+                          >
+                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-white shrink-0 shadow-sm border border-pink-50">
+                              <img 
+                                src={reminder.products.image_urls?.[0]} 
+                                alt={reminder.products.name} 
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[9px] font-black text-pink-600 uppercase tracking-widest leading-none mb-1">Planned Gift</p>
+                              <h5 className="text-gray-900 font-bold truncate text-[12px]">{reminder.products.name}</h5>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
-                      <button className="bg-pink-600 text-white px-5 py-3 rounded-xl text-xs font-black hover:bg-pink-700 transition-all shadow-lg shadow-pink-100 opacity-0 group-hover:opacity-100 cursor-pointer hidden sm:block">
+                      <button 
+                        onClick={() => navigate('/')}
+                        className="bg-pink-600 text-white px-5 py-3 rounded-xl text-xs font-black hover:bg-pink-700 transition-all shadow-lg shadow-pink-100 opacity-0 group-hover:opacity-100 cursor-pointer hidden sm:block"
+                      >
                         Shop Gifts
                       </button>
                     </motion.div>

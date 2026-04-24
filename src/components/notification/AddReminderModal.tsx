@@ -8,15 +8,18 @@ interface AddReminderModalProps {
   onClose: () => void;
   onSuccess: () => void;
   reminderToEdit?: any;
+  productId?: string;
 }
 
-const AddReminderModal: React.FC<AddReminderModalProps> = ({ isOpen, onClose, onSuccess, reminderToEdit }) => {
+const AddReminderModal: React.FC<AddReminderModalProps> = ({ isOpen, onClose, onSuccess, reminderToEdit, productId }) => {
   const [loading, setLoading] = useState(false);
+  const [attachedProduct, setAttachedProduct] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     reminder_date: '',
-    icon_name: 'flower'
+    icon_name: 'flower',
+    product_id: null as string | null
   });
 
   const availableIcons = [
@@ -30,23 +33,69 @@ const AddReminderModal: React.FC<AddReminderModalProps> = ({ isOpen, onClose, on
     { name: 'truck', icon: Truck },
   ];
 
+  // Fetch product details if productId is provided
+  useEffect(() => {
+    const fetchProduct = async () => {
+      if (!productId) {
+        setAttachedProduct(null);
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('id, name, image_urls, price')
+          .eq('id', productId)
+          .single();
+        if (!error && data) {
+          setAttachedProduct(data);
+          setFormData(prev => ({ ...prev, product_id: data.id }));
+        }
+      } catch (err) {
+        console.error('Error fetching attached product:', err);
+      }
+    };
+
+    if (isOpen) fetchProduct();
+  }, [productId, isOpen]);
+
+  // Handle reminderToEdit product fetch
+  useEffect(() => {
+    const fetchEditProduct = async () => {
+      if (reminderToEdit?.product_id) {
+        try {
+          const { data, error } = await supabase
+            .from('products')
+            .select('id, name, image_urls, price')
+            .eq('id', reminderToEdit.product_id)
+            .single();
+          if (!error && data) setAttachedProduct(data);
+        } catch (err) {
+          console.error('Error fetching edit product:', err);
+        }
+      }
+    };
+    if (isOpen && reminderToEdit) fetchEditProduct();
+  }, [reminderToEdit, isOpen]);
+
   useEffect(() => {
     if (reminderToEdit && isOpen) {
       setFormData({
         name: reminderToEdit.name || '',
         description: reminderToEdit.description || '',
         reminder_date: reminderToEdit.reminder_date ? reminderToEdit.reminder_date.split('T')[0] : '',
-        icon_name: reminderToEdit.icon_name || 'flower'
+        icon_name: reminderToEdit.icon_name || 'flower',
+        product_id: reminderToEdit.product_id || null
       });
     } else if (isOpen) {
       setFormData({
         name: '',
         description: '',
         reminder_date: '',
-        icon_name: 'flower'
+        icon_name: 'flower',
+        product_id: productId || null
       });
     }
-  }, [reminderToEdit, isOpen]);
+  }, [reminderToEdit, isOpen, productId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +110,8 @@ const AddReminderModal: React.FC<AddReminderModalProps> = ({ isOpen, onClose, on
         name: formData.name,
         description: formData.description,
         reminder_date: formData.reminder_date,
-        icon_name: formData.icon_name
+        icon_name: formData.icon_name,
+        product_id: formData.product_id
       };
 
       if (reminderToEdit?.id) {
@@ -140,6 +190,32 @@ const AddReminderModal: React.FC<AddReminderModalProps> = ({ isOpen, onClose, on
               </div>
 
               <div className="space-y-4">
+                {attachedProduct && (
+                  <div className="bg-pink-50/50 rounded-2xl p-4 border border-pink-100 flex items-center gap-4 mb-2">
+                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-white shrink-0 shadow-sm">
+                      <img 
+                        src={attachedProduct.image_urls?.[0]} 
+                        alt={attachedProduct.name} 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-black text-pink-600 uppercase tracking-widest mb-1">Gift Choice</p>
+                      <h5 className="text-gray-900 font-bold truncate text-sm">{attachedProduct.name}</h5>
+                      <p className="text-pink-600 font-bold text-xs">₱{Number(attachedProduct.price).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setAttachedProduct(null);
+                        setFormData(prev => ({ ...prev, product_id: null }));
+                      }}
+                      className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
                 <div>
                   <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Occasion Name</label>
                   <input

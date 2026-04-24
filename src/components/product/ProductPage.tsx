@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import Navbar from '../common/Navbar';
-import { ArrowLeft, Star, ShoppingBag, Plus, Minus, Store, Loader2, ChevronLeft, ChevronRight, Heart, MessageCircle, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Star, ShoppingBag, Plus, Minus, Store, Loader2, ChevronLeft, ChevronRight, Heart, MessageCircle, Image as ImageIcon, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import AddReminderModal from '../notification/AddReminderModal';
+import ReminderSelectionModal from '../notification/ReminderSelectionModal';
 
 interface Variant {
     id: string;
@@ -52,6 +54,8 @@ const ProductPage: React.FC = () => {
     const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
     const [isFavorite, setIsFavorite] = useState(false);
     const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
+    const [showReminderModal, setShowReminderModal] = useState(false);
+    const [showSelectionModal, setShowSelectionModal] = useState(false);
 
     useEffect(() => {
         const fetchProductData = async () => {
@@ -98,7 +102,7 @@ const ProductPage: React.FC = () => {
                     .neq('id', data.id)
                     .order('created_at', { ascending: false })
                     .limit(5);
-                    
+
                 if (!recError && recData) {
                     setRecommendedProducts(recData);
                 }
@@ -117,7 +121,7 @@ const ProductPage: React.FC = () => {
     const currentPrice = selectedVariant ? selectedVariant.price : (product?.price || 0);
     const maxStock = selectedVariant ? selectedVariant.stock : (product?.stock || 0);
     const isOutOfStock = maxStock <= 0;
-    
+
     // Realtime Presence State
     const [isShopOnline, setIsShopOnline] = useState(false);
 
@@ -126,7 +130,7 @@ const ProductPage: React.FC = () => {
         const ownerId = product.shops.owner_id;
 
         const channel = supabase.channel('global_presence');
-        
+
         channel.on('presence', { event: 'sync' }, () => {
             const newState = channel.presenceState();
             let online = false;
@@ -554,12 +558,22 @@ const ProductPage: React.FC = () => {
                                     <button
                                         onClick={handleToggleFavorite}
                                         className={`h-14 w-14 sm:w-16 flex items-center justify-center transition-all focus:outline-none hover:scale-110 active:scale-95 flex-shrink-0 ${isFavorite
-                                            ? 'text-pink-600'
-                                            : 'text-pink-400 hover:text-pink-500'
+                                            ? 'text-pink-500'
+                                            : 'text-pink-500 hover:text-pink-600'
                                             }`}
                                         aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
                                     >
-                                        <Heart size={42} className={isFavorite ? "fill-pink-600" : ""} />
+                                        <Heart size={42} className={isFavorite ? "fill-pink-500" : ""} />
+                                    </button>
+
+                                    {/* Remind Me Later Button */}
+                                    <button
+                                        onClick={() => setShowSelectionModal(true)}
+                                        className="h-14 w-14 sm:w-16 flex items-center justify-center transition-all focus:outline-none hover:scale-110 active:scale-95 flex-shrink-0 text-pink-500 hover:text-pink-600"
+                                        aria-label="Remind me later"
+                                        title="Remind me later"
+                                    >
+                                        <Clock size={42} />
                                     </button>
                                 </div>
                             </div>
@@ -631,7 +645,7 @@ const ProductPage: React.FC = () => {
                     <div className="mt-12">
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="text-2xl font-bold text-gray-800">More from this shop</h2>
-                            <button 
+                            <button
                                 onClick={() => navigate(`/shop/${product.shop_id}`)}
                                 className="text-pink-600 font-semibold hover:text-pink-700 hover:underline text-sm cursor-pointer focus:outline-none"
                             >
@@ -646,6 +660,34 @@ const ProductPage: React.FC = () => {
                     </div>
                 )}
             </main>
+            {product && (
+                <>
+                    <ReminderSelectionModal 
+                        isOpen={showSelectionModal}
+                        onClose={() => setShowSelectionModal(false)}
+                        onSelectCreateNew={() => {
+                            setShowSelectionModal(false);
+                            setShowReminderModal(true);
+                        }}
+                        onSuccess={(msg) => {
+                            setShowSelectionModal(false);
+                            setMessage({ text: msg, type: 'success' });
+                            setTimeout(() => setMessage(null), 3000);
+                        }}
+                        productId={product.id}
+                    />
+                    <AddReminderModal
+                        isOpen={showReminderModal}
+                        onClose={() => setShowReminderModal(false)}
+                        onSuccess={() => {
+                            setShowReminderModal(false);
+                            setMessage({ text: 'Reminder set successfully!', type: 'success' });
+                            setTimeout(() => setMessage(null), 3000);
+                        }}
+                        productId={product.id}
+                    />
+                </>
+            )}
         </div>
     );
 };
@@ -653,7 +695,7 @@ const ProductPage: React.FC = () => {
 /* ===== RECOMMENDED PRODUCT CARD ===== */
 const RecommendedProductCard = ({ product }: { product: Product }) => {
     const hasVariants = product.product_variants && product.product_variants.length > 0;
-    const maxStock = hasVariants 
+    const maxStock = hasVariants
         ? product.product_variants!.reduce((acc, v) => acc + v.stock, 0)
         : product.stock;
     const isOutOfStock = maxStock <= 0;
