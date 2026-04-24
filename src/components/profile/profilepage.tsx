@@ -8,9 +8,10 @@ import confetti from 'canvas-confetti';
 import PersonalInfoTab from './PersonalInfoTab';
 import SellerOnboardingTab from './SellerOnboardingTab';
 import AddressTab from './AddressTab';
+import RemindersTab from './RemindersTab';
 import { validateField, sanitizeInput } from '../../utils/characterValidation';
 
-import { User, Package, Heart, MapPin, LogOut, Settings, Camera, Loader2, Store } from 'lucide-react';
+import { User, Package, Heart, MapPin, LogOut, Settings, Camera, Loader2, Store, Pencil, Calendar } from 'lucide-react';
 
 interface ProfileData {
   username: string | null;
@@ -165,23 +166,24 @@ const ProfilePage: React.FC = () => {
           <aside className="w-full md:w-1/4">
             <div className="bg-white rounded-xl shadow-sm overflow-hidden sticky top-24">
               <div className="p-6 border-b border-gray-100 flex flex-col items-center">
-                <div className="w-24 h-24 bg-pink-100 rounded-full flex items-center justify-center text-pink-600 mb-3 relative overflow-hidden">
+                <div className="w-24 h-24 bg-pink-100 rounded-full flex items-center justify-center text-pink-600 mb-4 relative overflow-hidden shadow-inner">
                   {profile.avatar_url ? (
                     <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                   ) : ( <User size={48} /> )}
-                  <button className="absolute bottom-0 right-0 bg-pink-600 p-2 rounded-full text-white border-2 border-white cursor-pointer">
-                    <Camera size={14} />
-                  </button>
                 </div>
-                <h2 className="font-semibold text-gray-800 text-center">
+                <h2 className="font-bold text-gray-800 text-center flex items-center gap-2 group">
                   {profile.username || 'User'}
+                  <button className="text-gray-400 hover:text-pink-600 transition-colors cursor-pointer" title="Edit Profile">
+                    <Pencil size={14} />
+                  </button>
                 </h2>
-                <p className="text-sm text-gray-500">{profile.email}</p>
+                <p className="text-sm text-gray-500 font-medium">{profile.email}</p>
               </div>
               <nav className="p-2">
                 <SidebarItem icon={<User size={18}/>} label="Personal Info" isActive={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
                 <SidebarItem icon={<Package size={18}/>} label="My Orders" isActive={activeTab === 'orders'} onClick={() => setActiveTab('orders')} />
                 <SidebarItem icon={<Heart size={18}/>} label="Wishlist" isActive={activeTab === 'wishlist'} onClick={() => setActiveTab('wishlist')} />
+                <SidebarItem icon={<Calendar size={18}/>} label="Reminders" isActive={activeTab === 'reminders'} onClick={() => setActiveTab('reminders')} />
                 <SidebarItem icon={<MapPin size={18}/>} label="Addresses" isActive={activeTab === 'address'} onClick={() => setActiveTab('address')} />
                 <SidebarItem icon={<Settings size={18}/>} label="Settings" isActive={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
                 <SidebarItem icon={<Store size={18}/>} label={role === 'shop_owner' ? "My Shop" : "Sell on Edelweiss"} isActive={activeTab === 'shop'} onClick={() => setActiveTab('shop')}/>
@@ -221,7 +223,10 @@ const ProfilePage: React.FC = () => {
                 </div>
               )}
               {activeTab === 'address' && (
-                <AddressTab profile={profile} /> // Added profile prop for address pre-filling
+                <AddressTab profile={profile} />
+              )}
+              {activeTab === 'reminders' && (
+                <RemindersTab />
               )}
             </div>
           </main>

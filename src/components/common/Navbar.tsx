@@ -103,6 +103,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount: manualCount }) => {
                 )}
               </div>
               <button 
+                onClick={() => handleProtectedNavigation('/notifications')}
                 className="p-2 text-[#F4898E] rounded-full hover:bg-pink-50 transition-colors cursor-pointer"
                 aria-label="Notifications"
               >

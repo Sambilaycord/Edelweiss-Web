@@ -14,6 +14,7 @@ import CheckoutPage from './components/checkout/CheckoutPage';
 import SellerDashboard from './components/dashboard/dashboard';
 import ShopPage from './components/shop/ShopPage';
 import ProductPage from './components/product/ProductPage';
+import NotificationPage from './components/notification/NotificationPage';
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -112,6 +113,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <SellerDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <NotificationPage />
               </ProtectedRoute>
             }
           />
