@@ -60,13 +60,12 @@ const AddressTab: React.FC<AddressTabProps> = ({ profile }) => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-gray-800">My Addresses</h2>
-        <button 
+        <h2 className="text-2xl font-bold text-gray-800">My Addresses</h2>
+        <button
           onClick={handleAddNew}
           disabled={addresses.length >= 5}
-          className={`bg-pink-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-pink-100 flex items-center gap-2 ${
-            addresses.length >= 5 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-pink-700 cursor-pointer'
-          }`}
+          className={`bg-pink-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-pink-100 flex items-center gap-2 ${addresses.length >= 5 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-pink-700 cursor-pointer'
+            }`}
           title={addresses.length >= 5 ? "Maximum address limit reached" : "Add New Address"}
         >
           <Plus size={18} /> Add New Address
@@ -90,11 +89,10 @@ const AddressTab: React.FC<AddressTabProps> = ({ profile }) => {
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {addresses.map((addr) => (
-            <div 
-              key={addr.id} 
-              className={`p-5 border-2 rounded-2xl transition-all ${
-                addr.is_default ? 'border-pink-500 bg-pink-50/30' : 'border-gray-100 hover:border-pink-200'
-              }`}
+            <div
+              key={addr.id}
+              className={`p-5 border-2 rounded-2xl transition-all ${addr.is_default ? 'border-pink-500 bg-pink-50/30' : 'border-gray-100 hover:border-pink-200'
+                }`}
             >
               <div className="flex justify-between items-start">
                 {/* Information Layout */}
@@ -115,15 +113,15 @@ const AddressTab: React.FC<AddressTabProps> = ({ profile }) => {
                 {/* Actions */}
                 <div className="flex flex-col items-end gap-3">
                   <div className="flex gap-2">
-                    <button 
-                      onClick={() => handleEdit(addr)} 
+                    <button
+                      onClick={() => handleEdit(addr)}
                       className="text-gray-400 hover:text-pink-600 transition-colors cursor-pointer p-1"
                       title="Edit Address"
                     >
                       <Edit2 size={18} />
                     </button>
-                    <button 
-                      onClick={() => deleteAddress(addr.id)} 
+                    <button
+                      onClick={() => deleteAddress(addr.id)}
                       className="text-gray-400 hover:text-red-500 transition-colors cursor-pointer p-1"
                       title="Delete Address"
                     >
@@ -131,8 +129,8 @@ const AddressTab: React.FC<AddressTabProps> = ({ profile }) => {
                     </button>
                   </div>
                   {!addr.is_default && (
-                    <button 
-                      onClick={() => setDefault(addr.id)} 
+                    <button
+                      onClick={() => setDefault(addr.id)}
                       className="text-xs text-pink-600 font-bold hover:text-pink-700 cursor-pointer bg-pink-50 px-3 py-1.5 rounded-lg transition-colors"
                     >
                       Set Default
@@ -146,10 +144,10 @@ const AddressTab: React.FC<AddressTabProps> = ({ profile }) => {
       )}
 
       {showModal && (
-        <AddAddressModal 
-          profile={profile} 
-          addressToEdit={editingAddress} 
-          onClose={() => setShowModal(false)} 
+        <AddAddressModal
+          profile={profile}
+          addressToEdit={editingAddress}
+          onClose={() => setShowModal(false)}
           onSuccess={() => {
             fetchAddresses();
             setShowModal(false);

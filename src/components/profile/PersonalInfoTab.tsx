@@ -22,17 +22,17 @@ interface PersonalInfoTabProps {
   message: { text: string; type: 'success' | 'error' } | null;
 }
 
-const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ 
-  profile, 
-  setProfile, 
-  onSave, 
-  updating, 
-  message 
+const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
+  profile,
+  setProfile,
+  onSave,
+  updating,
+  message
 }) => {
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="px-10">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
       <h2 className="text-2xl font-bold mb-6 text-gray-800">Personal Information</h2>
-      
+
       {message && (
         <div className={`mb-4 p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
           {message.text}
@@ -43,37 +43,37 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
         {/* Names */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-          <input 
-            type="text" 
+          <input
+            type="text"
             value={profile.first_name || ''}
             maxLength={50}
             onChange={(e) => setProfile({ ...profile, first_name: e.target.value })}
             placeholder="Enter First Name"
-            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-pink-500 outline-none transition-shadow" 
+            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-pink-500 outline-none transition-shadow"
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-          <input 
-            type="text" 
+          <input
+            type="text"
             value={profile.last_name || ''}
             maxLength={50}
             onChange={(e) => setProfile({ ...profile, last_name: e.target.value })}
             placeholder="Enter Last Name"
-            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-pink-500 outline-none transition-shadow" 
+            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-pink-500 outline-none transition-shadow"
           />
         </div>
 
         {/* Email - Full Row */}
-        <div className="md:col-span-2"> 
+        <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input 
-            type="email" 
-            disabled 
+          <input
+            type="email"
+            disabled
             maxLength={254}
-            value={profile.email || ''} 
-            className="w-full border border-gray-300 bg-gray-100 text-gray-500 rounded-lg px-4 py-2 cursor-not-allowed" 
+            value={profile.email || ''}
+            className="w-full border border-gray-300 bg-gray-100 text-gray-500 rounded-lg px-4 py-2 cursor-not-allowed"
           />
         </div>
 
@@ -97,8 +97,8 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
             {['male', 'female', 'others'].map((option) => (
               <label key={option} className="flex items-center gap-2 cursor-pointer group">
                 <div className="relative flex items-center justify-center">
-                  <input 
-                    type="radio" 
+                  <input
+                    type="radio"
                     name="gender"
                     value={option}
                     checked={profile.gender === option}
@@ -118,19 +118,19 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
         {/* Birthday - Full Row */}
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-          <input 
-            type="date" 
+          <input
+            type="date"
             value={profile.birthdate || ''}
             onChange={(e) => setProfile({ ...profile, birthdate: e.target.value })}
-            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-pink-500 outline-none" 
+            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-pink-500 outline-none"
           />
         </div>
 
         {/* Submit */}
         <div className="md:col-span-2 mt-4">
-          <button 
-            type="submit" 
-            disabled={updating} 
+          <button
+            type="submit"
+            disabled={updating}
             className="flex items-center gap-2 bg-pink-600 text-white px-8 py-2.5 rounded-lg hover:bg-pink-700 transition-colors disabled:opacity-70 cursor-pointer font-medium"
           >
             {updating ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
