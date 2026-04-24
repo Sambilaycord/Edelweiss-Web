@@ -49,6 +49,10 @@ const AddressTab: React.FC<AddressTabProps> = ({ profile }) => {
   };
 
   const handleAddNew = () => {
+    if (addresses.length >= 5) {
+      alert("Maximum of 5 addresses reached. Please delete an existing address to add a new one.");
+      return;
+    }
     setEditingAddress(null);
     setShowModal(true);
   };
@@ -59,11 +63,22 @@ const AddressTab: React.FC<AddressTabProps> = ({ profile }) => {
         <h2 className="text-xl font-bold text-gray-800">My Addresses</h2>
         <button 
           onClick={handleAddNew}
-          className="bg-pink-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-pink-700 transition-all shadow-lg shadow-pink-100 flex items-center gap-2 cursor-pointer"
+          disabled={addresses.length >= 5}
+          className={`bg-pink-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-pink-100 flex items-center gap-2 ${
+            addresses.length >= 5 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-pink-700 cursor-pointer'
+          }`}
+          title={addresses.length >= 5 ? "Maximum address limit reached" : "Add New Address"}
         >
           <Plus size={18} /> Add New Address
         </button>
       </div>
+
+      {addresses.length >= 5 && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2">
+          <MapPin size={16} />
+          You have reached the maximum limit of 5 addresses.
+        </div>
+      )}
 
       {loading && addresses.length === 0 ? (
         <div className="flex justify-center py-10"><Loader2 className="animate-spin text-pink-600" /></div>

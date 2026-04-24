@@ -65,6 +65,19 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, addressToEdi
       if (formData.is_default) {
         await supabase.from('addresses').update({ is_default: false }).eq('user_id', user.id);
       }
+      
+      // 3. Precautionary check for max 5 addresses (only if creating NEW)
+      if (!addressToEdit?.id) {
+        const { count, error: countError } = await supabase
+          .from('addresses')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+        
+        if (countError) throw countError;
+        if (count !== null && count >= 5) {
+          throw new Error("Maximum of 5 addresses reached.");
+        }
+      }
 
       // 3. Prepare payload for UPSERT
       const payload = {

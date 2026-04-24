@@ -1,17 +1,50 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Heart, ShoppingBag, Loader2, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+const ITEMS_PER_PAGE = 16;
+
 const WishlistTab: React.FC = () => {
   const [wishlist, setWishlist] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
   const navigate = useNavigate();
+  const observer = useRef<IntersectionObserver | null>(null);
 
-  const fetchWishlist = async () => {
+  const lastElementRef = useCallback((node: HTMLDivElement) => {
+    if (loading || loadingMore) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        setPage(prevPage => prevPage + 1);
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [loading, loadingMore, hasMore]);
+
+  const fetchWishlist = async (pageNum: number) => {
     try {
+      if (pageNum === 0) setLoading(true);
+      else setLoadingMore(true);
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      const from = pageNum * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+
+      // Also get total count on first load
+      if (pageNum === 0) {
+        const { count } = await supabase
+          .from('user_favorites')
+          .select('*', { count: 'exact', head: true })
+          .eq('customer_id', user.id);
+        setTotalCount(count || 0);
+      }
 
       const { data, error } = await supabase
         .from('user_favorites')
@@ -26,14 +59,21 @@ const WishlistTab: React.FC = () => {
             description
           )
         `)
-        .eq('customer_id', user.id);
+        .eq('customer_id', user.id)
+        .order('id', { ascending: false }) // Use ID as a stable sort if created_at isn't available or preferred
+        .range(from, to);
 
       if (error) throw error;
-      setWishlist(data || []);
+
+      if (data) {
+        setWishlist(prev => pageNum === 0 ? data : [...prev, ...data]);
+        setHasMore(data.length === ITEMS_PER_PAGE);
+      }
     } catch (err) {
       console.error('Error fetching wishlist:', err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -46,22 +86,23 @@ const WishlistTab: React.FC = () => {
 
       if (error) throw error;
       setWishlist(prev => prev.filter(item => item.id !== favoriteId));
+      setTotalCount(prev => Math.max(0, prev - 1));
     } catch (err) {
       console.error('Error removing from wishlist:', err);
     }
   };
 
   useEffect(() => {
-    fetchWishlist();
-  }, []);
+    fetchWishlist(page);
+  }, [page]);
 
-  if (loading) return (
+  if (loading && page === 0) return (
     <div className="flex justify-center py-20">
       <Loader2 className="animate-spin text-pink-600" size={32} />
     </div>
   );
 
-  if (wishlist.length === 0) return (
+  if (wishlist.length === 0 && !loading) return (
     <div className="text-center py-20 text-gray-500">
       <div className="w-20 h-20 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-4">
         <Heart size={32} className="text-pink-300" />
@@ -81,12 +122,16 @@ const WishlistTab: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">My Wishlist</h2>
-        <span className="text-sm font-medium text-gray-500">{wishlist.length} Items</span>
+        <span className="text-sm font-medium text-gray-500">{totalCount} Items</span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {wishlist.map((item) => (
-          <div key={item.id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 flex gap-4 hover:shadow-md transition-all group relative">
+        {wishlist.map((item, index) => (
+          <div
+            key={item.id}
+            ref={index === wishlist.length - 1 ? lastElementRef : null}
+            className="bg-white border-2 border-gray-100 rounded-2xl p-4 flex gap-4 hover:shadow-md transition-all group relative"
+          >
             <button
               onClick={() => removeFromWishlist(item.id)}
               className="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors p-1 z-10"
@@ -121,6 +166,18 @@ const WishlistTab: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {loadingMore && (
+        <div className="flex justify-center py-6">
+          <Loader2 className="animate-spin text-pink-600" size={24} />
+        </div>
+      )}
+
+      {!hasMore && wishlist.length > 0 && (
+        <p className="text-center text-gray-400 text-sm py-8">
+          You've reached the end of your wishlist.
+        </p>
+      )}
     </div>
   );
 };

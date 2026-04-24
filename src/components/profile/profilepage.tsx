@@ -9,6 +9,7 @@ import PersonalInfoTab from './PersonalInfoTab';
 import SellerOnboardingTab from './SellerOnboardingTab';
 import AddressTab from './AddressTab';
 import WishlistTab from './WishlistTab';
+import OrdersTab from './OrdersTab';
 import { validateField, sanitizeInput } from '../../utils/characterValidation';
 
 import { User, Package, Heart, MapPin, LogOut, Settings, Camera, Loader2, Store, Pencil } from 'lucide-react';
@@ -222,10 +223,7 @@ const ProfilePage: React.FC = () => {
                 />
               )}
               {activeTab === 'orders' && (
-                <div className="text-center py-20 text-gray-500">
-                  <Package size={48} className="mx-auto mb-4 text-gray-300" />
-                  <p>No orders yet.</p>
-                </div>
+                <OrdersTab />
               )}
               {activeTab === 'address' && (
                 <AddressTab profile={profile} /> // Added profile prop for address pre-filling
