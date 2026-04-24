@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, Bell, Search } from 'lucide-react';
+import { ShoppingCart, User, Bell, Search, Store } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 
 import logo from '../../assets/logo.png';
@@ -10,29 +10,12 @@ interface NavbarProps {
   cartCount?: number; 
 }
 
-const Navbar: React.FC<NavbarProps> = ({ cartCount: manualCount }) => {
+const Navbar: React.FC<NavbarProps> = ({ cartCount: propCount }) => {
   const navigate = useNavigate();
+  const [count, setCount] = useState(0);
   const [session, setSession] = useState<any>(null);
-  const [dbCartCount, setDbCartCount] = useState(0);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) fetchCartCount(session.user.id);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) {
-        fetchCartCount(session.user.id);
-      } else {
-        setDbCartCount(0);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchCartCount = async (userId: string) => {
+  const fetchCartCount = useCallback(async (userId: string) => {
     const { data: cart } = await supabase
       .from('carts')
       .select('id')
@@ -40,14 +23,56 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount: manualCount }) => {
       .maybeSingle();
 
     if (cart) {
-      const { count } = await supabase
+      const { count: itemsCount } = await supabase
         .from('cart_items')
         .select('*', { count: 'exact', head: true })
         .eq('cart_id', cart.id);
       
-      setDbCartCount(count || 0);
+      setCount(itemsCount || 0);
+    } else {
+      setCount(0);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    // Initial Session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) fetchCartCount(session.user.id);
+    });
+
+    // Auth Listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) {
+        fetchCartCount(session.user.id);
+      } else {
+        setCount(0);
+      }
+    });
+
+    // Realtime Listener for Cart Items
+    const channel = supabase.channel('navbar_cart_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'cart_items' 
+      }, async (payload) => {
+        console.log("Cart change detected:", payload);
+        const { data: { session: s } } = await supabase.auth.getSession();
+        if (s?.user?.id) {
+          fetchCartCount(s.user.id);
+        }
+      })
+      .subscribe((status) => {
+        console.log("Realtime subscription status:", status);
+      });
+
+    return () => {
+      subscription.unsubscribe();
+      supabase.removeChannel(channel);
+    };
+  }, [fetchCartCount, session?.user?.id]);
 
   const handleProtectedNavigation = (path: string) => {
     if (!session) {
@@ -57,7 +82,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount: manualCount }) => {
     }
   };
 
-  const currentCount = manualCount ?? dbCartCount;
+  const currentCount = propCount !== undefined ? propCount : count;
 
   return (
     <>
@@ -70,12 +95,16 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount: manualCount }) => {
       </div>
       <header className="sticky top-0 bg-white/95 backdrop-blur z-40 shadow-sm">
         <div className="max-w-full mx-auto flex items-center justify-between py-4 px-10">
+          
+          {/* Left: Logo */}
           <Link to="/" className="flex items-center gap-4 group">
             <img src={logo} alt="logo" className="w-12 h-12 object-contain group-hover:scale-105 transition-transform" />
             <img src={text_logo} alt="Edelweiss" className="h-6 object-contain" />
           </Link>
+
+          {/* Center: Search Bar */}
           <div className="hidden md:flex w-[40%] mx-auto">
-            <form className="relative w-full" onSubmit={(e) => { e.preventDefault(); /* Add search logic here */ }}>
+            <form className="relative w-full" onSubmit={(e) => { e.preventDefault(); }}>
               <input 
                 type="text" 
                 placeholder="Search for items..." 
@@ -86,8 +115,11 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount: manualCount }) => {
               </button>
             </form>
           </div>
+
+          {/* Right: Icons */}
           <div className="flex items-center gap-4">
             <div className="relative flex items-center gap-1">
+              {/* Cart Icon */}
               <div className="relative">
                 <button 
                   onClick={() => handleProtectedNavigation('/cart')} 
@@ -102,6 +134,8 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount: manualCount }) => {
                   </span>
                 )}
               </div>
+              
+              {/* Notifications */}
               <button 
                 onClick={() => handleProtectedNavigation('/notifications')}
                 className="p-2 text-[#F4898E] rounded-full hover:bg-pink-50 transition-colors cursor-pointer"
@@ -109,6 +143,8 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount: manualCount }) => {
               >
                 <Bell className="w-6 h-6" />
               </button>
+
+              {/* Profile/Account */}
               <button 
                 onClick={() => handleProtectedNavigation('/profile')} 
                 className="p-2 text-[#F4898E] rounded-full hover:bg-pink-50 transition-colors cursor-pointer"
