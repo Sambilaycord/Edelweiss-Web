@@ -1,88 +1,107 @@
 import React, { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ChevronDown, Star, Image as ImageIcon } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 // 1. Define the shape of a single Product
-export interface Product {
-  id: number;
+export type Product = {
+  id: string | number;
   name: string;
   desc: string;
   price: number;
   image?: string;
-}
+  average_rating?: number;
+  review_count?: number;
+};
 
 // 2. Define the props
 interface FeaturedProductsProps {
   products: Product[];
-  onAddToCart: (product: Product) => void;
+  onAddToCart?: (product: Product) => void;
 }
 
-const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ products, onAddToCart }) => {
+const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ products }) => {
+  const navigate = useNavigate();
   // STATE: Control how many products are visible
-  // Initial: 8 products (2 rows on desktop)
   const [visibleCount, setVisibleCount] = useState(8);
 
-  // HANDLER: Increase the visible count by 4 (1 row on desktop)
+  // HANDLER: Increase the visible count by 4
   const handleSeeMore = () => {
     setVisibleCount((prevCount) => prevCount + 4);
   };
 
   return (
-    <section id="products" className="py-8 max-w-[1400px] mx-auto px-4">
-      <h2 className="text-2xl font-semibold mb-6 font-serif text-gray-800">
-        Featured products
-      </h2>
+    <section id="products" className="py-12 max-w-7xl mx-auto px-4">
+      <div className="flex items-center justify-between mb-8">
+        <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
+          Featured Products
+        </h2>
+        <div className="h-[2px] bg-pink-100 flex-1 ml-6 rounded-full hidden md:block opacity-50"></div>
+      </div>
 
       {/* Product Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        
-        {/* SLICE: Only map the products up to the visibleCount */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {products.slice(0, visibleCount).map((p) => (
-          <div 
-            key={p.id} 
-            className="group bg-white rounded-lg shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-300 p-4 flex flex-col"
+          <motion.div 
+            key={p.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            whileHover={{ y: -5 }}
+            className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-xl transition-all cursor-pointer flex flex-col h-full"
+            onClick={() => navigate(`/product/${p.id}`)}
           >
-            {/* Image Placeholder */}
-            <div className="h-40 bg-gray-100 rounded-md mb-4 flex items-center justify-center text-gray-400 overflow-hidden relative">
+            {/* Image */}
+            <div className="relative aspect-square bg-gray-50 overflow-hidden">
               {p.image ? (
                 <img 
                   src={p.image} 
                   alt={p.name} 
-                  className="h-full w-full object-cover rounded-md group-hover:scale-105 transition-transform duration-500" 
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                 />
               ) : (
-                <span className="text-sm">Image</span>
+                <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
+                  <ImageIcon size={40} />
+                </div>
               )}
             </div>
 
-            <h3 className="font-semibold text-lg mb-1 text-gray-900">{p.name}</h3>
-            <p className="text-sm text-gray-500 flex-1 mb-4 line-clamp-2">{p.desc}</p>
-            
-            <div className="mt-auto flex items-center justify-between pt-4 border-t border-gray-50">
-              <div className="text-lg font-bold text-pink-600">
-                ${p.price.toFixed(2)}
-              </div>
+            {/* Info */}
+            <div className="p-5 flex flex-col flex-1">
+              <h3 className="font-medium text-gray-800 text-sm mb-1 line-clamp-2 md:text-base group-hover:text-pink-600 transition-colors">
+                {p.name}
+              </h3>
+              {p.desc && (
+                <p className="text-xs text-gray-500 mb-3 line-clamp-2 leading-relaxed">
+                  {p.desc}
+                </p>
+              )}
               
-              <button
-                onClick={() => onAddToCart(p)}
-                className="px-4 py-2 bg-pink-500 text-white text-sm font-medium rounded-full hover:bg-pink-600 hover:shadow-md transition-all active:scale-95"
-              >
-                Add to cart
-              </button>
+              <div className="mt-auto pt-3 border-t border-gray-50 flex items-center justify-between">
+                <span className="text-pink-600 font-bold text-base md:text-lg">
+                  ₱{p.price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                </span>
+                
+                {p.review_count !== undefined && p.review_count > 0 && (
+                  <div className="flex items-center gap-1 text-xs bg-yellow-50 px-2 py-1 rounded-lg text-gray-800 font-bold border border-yellow-100">
+                    <Star size={12} className="text-yellow-500 fill-yellow-500" />
+                    <span>{Number(p.average_rating || 0).toFixed(1)}</span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
 
       {/* "See More" Button Area */}
-      {/* CONDITION: Only show if there are more products to show */}
       {visibleCount < products.length && (
-        <div className="mt-10 flex justify-center">
+        <div className="mt-12 flex justify-center">
           <button
             onClick={handleSeeMore}
-            className="flex items-center gap-2 px-8 py-3 bg-white border border-gray-300 text-gray-700 font-medium rounded-full hover:bg-gray-50 hover:border-pink-300 hover:text-pink-600 transition-all duration-300 shadow-sm"
+            className="flex items-center gap-2 px-10 py-3.5 bg-white border border-gray-200 text-gray-700 font-bold rounded-2xl hover:bg-pink-50 hover:border-pink-200 hover:text-pink-600 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer"
           >
-            See More Products
-            <ChevronDown className="w-4 h-4" />
+            Explore More Gifts
+            <ChevronDown className="w-5 h-5 group-hover:translate-y-1 transition-transform" />
           </button>
         </div>
       )}
@@ -90,4 +109,4 @@ const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ products, onAddToCa
   );
 };
 
-export default FeaturedProducts;
+export default FeaturedProducts;
