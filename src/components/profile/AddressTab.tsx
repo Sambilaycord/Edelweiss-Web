@@ -58,7 +58,7 @@ const AddressTab: React.FC<AddressTabProps> = ({ profile }) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 flex-1 flex flex-col">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800">My Addresses</h2>
         <button
@@ -82,7 +82,7 @@ const AddressTab: React.FC<AddressTabProps> = ({ profile }) => {
       {loading && addresses.length === 0 ? (
         <div className="flex justify-center py-10"><Loader2 className="animate-spin text-pink-600" /></div>
       ) : addresses.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed border-gray-100 rounded-2xl">
+        <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-gray-100 rounded-2xl">
           <MapPin size={48} className="mx-auto text-gray-200 mb-4" />
           <p className="text-gray-400">No addresses saved yet.</p>
         </div>

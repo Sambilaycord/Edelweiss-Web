@@ -89,7 +89,7 @@ const RemindersTab: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 flex-1 flex flex-col">
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center">
           <h2 className="text-2xl font-bold text-gray-800">Special Occasions</h2>
@@ -133,7 +133,7 @@ const RemindersTab: React.FC = () => {
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-pink-600" /></div>
       ) : reminders.length === 0 ? (
-        <div className="text-center py-20 bg-gray-50/50 rounded-[32px] border-2 border-dashed border-gray-100">
+        <div className="flex-1 flex flex-col items-center justify-center bg-gray-50/50 rounded-[32px] border-2 border-dashed border-gray-100">
           <Calendar size={48} className="mx-auto text-gray-200 mb-4" />
           <h3 className="text-lg font-bold text-gray-800">No reminders set</h3>
           <p className="text-sm text-gray-400">Add birthdays, anniversaries and more.</p>

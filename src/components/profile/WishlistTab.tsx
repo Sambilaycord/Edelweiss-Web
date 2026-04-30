@@ -103,7 +103,7 @@ const WishlistTab: React.FC = () => {
   );
 
   if (wishlist.length === 0 && !loading) return (
-    <div className="text-center py-20 text-gray-500">
+    <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
       <div className="w-20 h-20 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-4">
         <Heart size={32} className="text-pink-300" />
       </div>
@@ -119,7 +119,7 @@ const WishlistTab: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 flex-1 flex flex-col">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">My Wishlist</h2>
         <span className="text-sm font-medium text-gray-500">{totalCount} Items</span>

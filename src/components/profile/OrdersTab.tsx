@@ -112,7 +112,7 @@ const OrdersTab: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 flex-1 flex flex-col">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold text-gray-800">My Orders</h2>
       </div>
@@ -141,7 +141,7 @@ const OrdersTab: React.FC = () => {
       </div>
 
       {/* Content Area */}
-      <div className="mt-8">
+      <div className="mt-8 flex-1 flex flex-col">
         {loading && page === 0 ? (
           <div className="flex justify-center py-20">
             <Loader2 className="animate-spin text-pink-600" size={32} />
@@ -150,7 +150,7 @@ const OrdersTab: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center py-20 text-gray-500 bg-gray-50/50 rounded-[32px] border-2 border-dashed border-gray-100"
+            className="flex-1 flex flex-col items-center justify-center text-gray-500 bg-gray-50/50 rounded-[32px] border-2 border-dashed border-gray-100"
           >
             <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
               <Package size={32} className="text-gray-200" />
