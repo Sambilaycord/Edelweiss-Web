@@ -1,12 +1,15 @@
+<img width="2559" height="757" alt="image" src="https://github.com/user-attachments/assets/ff5373b3-7068-40d1-b45b-6d14dab84efc" />
+
+
 # 🌸 Edelweiss Web
 
-**Edelweiss** is a conceptual e-commerce project designed to envision a unified marketplace connecting flower shops and customers across Northern Mindanao. This project aims to explore how we can transform the traditional flower shopping experience by proposing a seamless, transparent, and highly customizable platform for floral gifting.
+**Edelweiss** is a conceptual e-commerce project designed to envision a unified marketplace connecting flower shops and customers across Northern Mindanao. This project aims to explore how the traditional flower shopping experience can be transformed by proposing a seamless, transparent, and highly customizable platform for floral gifting.
 
 ## 📖 Project Background
 
 Buying flowers traditionally often involves inconvenient trips to physical stores, inconsistent freshness, limited customization options, and unclear pricing across different local florists. 
 
-The Edelweiss project was conceptualized to solve these problems by designing a unified digital marketplace. The core idea is that whether it's for a corporate event or a personal milestone, users could easily browse, compare real-time prices, and personalize their floral arrangements without leaving their homes. Our goal with this project is to build a fully functional prototype that makes floral gifting as seamless and tailored as possible.
+The Edelweiss project was conceptualized to solve these problems by designing a unified digital marketplace. The core idea is that whether it's for a corporate event or a personal milestone, users could easily browse, compare real-time prices, and personalize their floral arrangements without leaving their homes. The goal of this project is to build a fully functional prototype that makes floral gifting as seamless and tailored as possible.
 
 ## 💻 Tech Stack (Prototype)
 - **Frontend**: React 19, TypeScript, Vite
@@ -14,23 +17,26 @@ The Edelweiss project was conceptualized to solve these problems by designing a 
 - **Backend**: Supabase
 
 ## ✨ Features Currently Implemented
-As we build out this concept, the following features have been successfully developed in our prototype:
+
+**<img width="2500" height="1376" alt="image" src="https://github.com/user-attachments/assets/01e5743c-e284-4cb6-bdd7-38912a6041d4" />**
+
+> [!WARNING]
+> **Disclaimer:** This project is currently in active development. Features and database schemas are being actively updated/changed.
+> 
+> **Asset Disclaimer:** The image assets used in this repository are not my own and serve strictly as placeholders for demonstration purposes. Some pictures include AI-generated content. This does not affect the overall functionality or code of the project.
+
+As this concept is built out, the following features have been successfully developed in the prototype:
+- **Authentication System**: Secure login and sign-up flows using email authentication.
+- **Vendor Dashboard & User Profile Integration**: A seamless transition between a comprehensive seller dashboard and the standard user profile, allowing users to manage both personal information and storefront data smoothly.
 - **Dynamic Storefront**: A responsive home page featuring promotional carousels (Flash Sales, Launch Month specials) and an intuitive category grid.
 - **Seamless Product Browsing**: A user interface designed to navigate through curated catalogs of floral arrangements from simulated local shops.
 - **Persistent Wishlist**: A working favorites system (via an interactive heart icon) securely stored using Supabase.
 - **Shopping Cart & Checkout Flow**: A functional cart management and mock checkout experience.
 - **Gift Reminder System**: A prototype dual-path reminder system equipped with gift-linking logic to help users remember significant events.
-- **User Profiles**: Basic account management for personal information and preferences.
-
-## 🚀 Features Currently Being Worked On
-As the project evolves, we are actively developing the following concepts:
-- **Order Personalization Mechanics**: Building interfaces that allow customers to deeply customize bouquets, add tailored messages, and select specific add-ons.
-- **Simulated Real-Time Tracking**: Developing a UI flow to demonstrate how users would track their order status from preparation to delivery.
-- **Subscription Plan Workflows**: Creating the user experience for weekly fresh flower delivery subscriptions.
-- **Vendor Dashboard Concept**: Designing tools that local flower shop owners would use to manage orders efficiently and update bouquet prices.
-- **Enhanced Promotional UI**: Refining visual assets and layout responsiveness to make the storefront feel truly premium.
 
 ## 🛠️ Getting Started
+
+<img width="2494" height="1375" alt="image" src="https://github.com/user-attachments/assets/208f0a84-8314-43cc-b4d8-b9d9302c2829" />
 
 ### Prerequisites
 - Node.js (v18 or higher)
