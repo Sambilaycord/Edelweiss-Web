@@ -30,8 +30,10 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
   message
 }) => {
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <h2 className="text-2xl font-bold mb-6 text-gray-800">Personal Information</h2>
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 flex-1 flex flex-col">
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm -mx-8 px-8 py-4 -mt-8 border-b border-gray-100 flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">Personal Information</h2>
+      </div>
 
       {message && (
         <div className={`mb-4 p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
@@ -39,7 +41,8 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
         </div>
       )}
 
-      <form onSubmit={onSave} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <form onSubmit={onSave} className="flex-1 flex flex-col">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         {/* Names */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
@@ -126,12 +129,14 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
           />
         </div>
 
+        </div>
+
         {/* Submit */}
-        <div className="md:col-span-2 mt-4">
+        <div className="mt-auto pt-8 flex justify-end">
           <button
             type="submit"
             disabled={updating}
-            className="flex items-center gap-2 bg-pink-600 text-white px-8 py-2.5 rounded-lg hover:bg-pink-700 transition-colors disabled:opacity-70 cursor-pointer font-medium"
+            className="flex items-center gap-2 bg-pink-600 text-white px-10 py-3 rounded-xl hover:bg-pink-700 transition-all shadow-lg shadow-pink-100 disabled:opacity-70 cursor-pointer font-bold text-sm"
           >
             {updating ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
             {updating ? 'Saving...' : 'Save Changes'}

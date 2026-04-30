@@ -60,7 +60,7 @@ const SellerOnboardingTab: React.FC<SellerOnboardingProps> = ({ role, profile, o
   // 1. IF ALREADY A SELLER: Show Dashboard Link
   if (role === 'shop_owner') {
     return (
-      <div className="flex flex-col items-center justify-center py-20">
+      <div className="flex-1 flex flex-col items-center justify-center">
         <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center text-green-600 mb-4">
           <CheckCircle2 size={32} />
         </div>
@@ -156,7 +156,7 @@ const SellerOnboardingTab: React.FC<SellerOnboardingProps> = ({ role, profile, o
 
   // 3. IF CUSTOMER: Show the "Become a Seller" Ad
   return (
-    <div className="flex flex-col items-center py-10">
+    <div className="flex-1 flex flex-col items-center justify-center">
       <div className="w-20 h-20 bg-pink-50 rounded-3xl flex items-center justify-center text-pink-600 mb-6 rotate-3">
         <Store size={40} />
       </div>
@@ -171,7 +171,7 @@ const SellerOnboardingTab: React.FC<SellerOnboardingProps> = ({ role, profile, o
         <FeatureItem text="Customizable shop branding" />
       </div>
       <button 
-        onClick={() => navigate('/become-a-seller')} // Link to the new page
+        onClick={() => setIsRegistering(true)}
         className="group flex items-center gap-2 bg-pink-600 text-white px-10 py-4 rounded-2xl font-bold hover:bg-pink-700 transition-all shadow-xl shadow-pink-100 cursor-pointer"
       >
         Open Your Shop Now <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />

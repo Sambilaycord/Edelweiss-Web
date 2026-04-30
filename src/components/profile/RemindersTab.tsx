@@ -158,7 +158,7 @@ const RemindersTab: React.FC = () => {
                       <p className="text-gray-500 text-sm italic pr-4">{reminder.description}</p>
                     )}
                     {reminder.products && (
-                      <div 
+                      <div
                         onClick={(e) => {
                           e.stopPropagation();
                           navigate(`/product/${reminder.products?.id}`);
@@ -166,9 +166,9 @@ const RemindersTab: React.FC = () => {
                         className="mt-3 bg-pink-50/50 rounded-xl p-3 border border-pink-100 flex items-center gap-3 cursor-pointer hover:bg-pink-50 transition-colors group/gift"
                       >
                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-white shrink-0 shadow-sm">
-                          <img 
-                            src={reminder.products.image_urls?.[0]} 
-                            alt={reminder.products.name} 
+                          <img
+                            src={reminder.products.image_urls?.[0]}
+                            alt={reminder.products.name}
                             className="w-full h-full object-cover group-hover/gift:scale-110 transition-transform"
                           />
                         </div>

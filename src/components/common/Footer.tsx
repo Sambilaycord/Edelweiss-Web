@@ -1,5 +1,6 @@
 import React from 'react';
 import { Mail, Phone, MapPin, Facebook, Instagram, Twitter } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const Footer: React.FC = () => {
   return (
@@ -18,10 +19,17 @@ const Footer: React.FC = () => {
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-white">Quick Links</h3>
           <ul className="space-y-2 text-sm text-gray-400">
-            <li><a href="/" className="hover:text-pink-400 transition-colors">Home</a></li>
-            <li><a href="/shop" className="hover:text-pink-400 transition-colors">Shop</a></li>
-            <li><a href="/profile" className="hover:text-pink-400 transition-colors">My Profile</a></li>
-            <li><a href="/become-a-seller" className="hover:text-pink-400 transition-colors">Become a Seller</a></li>
+            <li><Link to="/" className="hover:text-pink-400 transition-colors">Home</Link></li>
+            <li><Link to="/profile" className="hover:text-pink-400 transition-colors">My Profile</Link></li>
+            <li>
+              <Link
+                to="/profile"
+                state={{ activeTab: 'shop' }}
+                className="hover:text-pink-400 transition-colors"
+              >
+                Become a Seller
+              </Link>
+            </li>
           </ul>
         </div>
 

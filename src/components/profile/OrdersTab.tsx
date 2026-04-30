@@ -14,7 +14,7 @@ const OrdersTab: React.FC = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  
+
   const observer = useRef<IntersectionObserver | null>(null);
 
   const lastElementRef = useCallback((node: HTMLDivElement) => {
@@ -147,7 +147,7 @@ const OrdersTab: React.FC = () => {
             <Loader2 className="animate-spin text-pink-600" size={32} />
           </div>
         ) : orders.length === 0 ? (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-center py-20 text-gray-500 bg-gray-50/50 rounded-[32px] border-2 border-dashed border-gray-100"
@@ -163,8 +163,8 @@ const OrdersTab: React.FC = () => {
         ) : (
           <div className="space-y-6">
             {orders.map((order, index) => (
-              <div 
-                key={order.id} 
+              <div
+                key={order.id}
                 ref={index === orders.length - 1 ? lastElementRef : null}
                 className="bg-white border-2 border-gray-100 rounded-[24px] p-6 hover:shadow-lg transition-all"
               >
@@ -184,8 +184,8 @@ const OrdersTab: React.FC = () => {
                   {order.order_items?.map((item: any) => (
                     <div key={item.id} className="flex gap-4">
                       <div className="w-16 h-16 rounded-xl bg-gray-50 overflow-hidden flex-shrink-0">
-                        <img 
-                          src={item.products?.image_urls?.[0] || 'https://via.placeholder.com/150'} 
+                        <img
+                          src={item.products?.image_urls?.[0] || 'https://via.placeholder.com/150'}
                           alt={item.products?.name}
                           className="w-full h-full object-cover"
                         />

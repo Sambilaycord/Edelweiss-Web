@@ -50,6 +50,11 @@ const ProfilePage: React.FC = () => {
     }
   }, [location.state]);
 
+  // 4. Scroll to top on every tab switch
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [activeTab]);
+
   const [profile, setProfile] = useState<ProfileData>({
     username: '',
     first_name: '',
@@ -204,7 +209,7 @@ const ProfilePage: React.FC = () => {
           </aside>
 
           <main className="flex-1">
-            <div className="bg-white rounded-xl shadow-sm p-8 min-h-[500px]">
+            <div className="bg-white rounded-xl shadow-sm p-8 h-[680px] overflow-y-auto flex flex-col">
               {activeTab === 'profile' && (
                 <PersonalInfoTab
                   profile={profile}
