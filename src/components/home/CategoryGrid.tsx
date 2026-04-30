@@ -28,7 +28,7 @@ const CategoryCircles = () => {
   ];
 
   return (
-    <section className="relative py-8 mx-auto">
+    <section className="relative py-4 mt-8 mx-auto">
       <h2 className="text-2xl font-bold text-gray-800 mb-6 font-serif">
         Shop by Category
       </h2>
@@ -76,8 +76,8 @@ const CategoryCircles = () => {
                 <h2 className="text-2xl md:text-3xl font-bold text-gray-900 font-serif">Explore Categories</h2>
                 <p className="text-gray-500 text-sm md:text-base mt-1">Find the perfect arrangement for any occasion</p>
               </div>
-              <button 
-                onClick={() => setIsModalOpen(false)} 
+              <button
+                onClick={() => setIsModalOpen(false)}
                 className="p-2.5 hover:bg-gray-100 rounded-full transition-all cursor-pointer group"
               >
                 <X size={24} className="text-gray-400 group-hover:text-pink-600 transition-colors" />
@@ -107,7 +107,7 @@ const CategoryCircles = () => {
                 ))}
               </div>
             </div>
-            
+
             {/* Modal Footer */}
             <div className="p-6 border-t border-gray-100 bg-white text-center">
               <p className="text-gray-400 text-xs md:text-sm font-medium italic">
@@ -121,4 +121,4 @@ const CategoryCircles = () => {
   );
 };
 
-export default CategoryCircles;
+export default CategoryCircles;
