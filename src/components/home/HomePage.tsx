@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabaseClient';
 import Navbar from '../common/Navbar';
@@ -10,7 +11,7 @@ import FeaturedProducts from './FeaturedProducts';
 import type { Product } from './FeaturedProducts';
 
 const HomePage: React.FC = () => {
-	const [cartCount, setCartCount] = useState(0);
+    const navigate = useNavigate();
 	const [products, setProducts] = useState<Product[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [loadingMore, setLoadingMore] = useState(false);
@@ -73,8 +74,63 @@ const HomePage: React.FC = () => {
 		}
 	};
 
-	const addToCart = (p: Product) => {
-		setCartCount((c) => c + 1);
+	const addToCart = async (p: Product) => {
+		const { data: { user } } = await supabase.auth.getUser();
+
+		if (!user) {
+			navigate('/login');
+			return;
+		}
+
+		try {
+			let cartId = null;
+			const { data: existingCart } = await supabase
+				.from('carts')
+				.select('id')
+				.eq('customer_id', user.id)
+				.maybeSingle();
+
+			if (existingCart) {
+				cartId = existingCart.id;
+			} else {
+				const { data: newCart, error: newCartError } = await supabase
+					.from('carts')
+					.insert({ customer_id: user.id })
+					.select('id')
+					.single();
+
+				if (newCartError) throw newCartError;
+				cartId = newCart?.id;
+			}
+
+			if (!cartId) return;
+
+			const { data: existingItem } = await supabase
+				.from('cart_items')
+				.select('id, quantity')
+				.eq('cart_id', cartId)
+				.eq('product_id', p.id)
+				.is('variant_id', null)
+				.maybeSingle();
+
+			if (existingItem) {
+				await supabase
+					.from('cart_items')
+					.update({ quantity: existingItem.quantity + 1 })
+					.eq('id', existingItem.id);
+			} else {
+				await supabase
+					.from('cart_items')
+					.insert({
+						cart_id: cartId,
+						product_id: p.id,
+						quantity: 1,
+						variant_id: null
+					});
+			}
+		} catch (error) {
+			console.error("Error adding to cart from home:", error);
+		}
 	};
 
 	return (
@@ -85,7 +141,7 @@ const HomePage: React.FC = () => {
 			transition={{ duration: 0.5 }} // Smooth 0.5s transition
 			className="min-h-screen"
 		>
-			<Navbar cartCount={cartCount} />
+			<Navbar />
 
 			<main className="max-w-7/10 mx-auto pt-6">
 				<HeroCarousel />

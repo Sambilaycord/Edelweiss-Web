@@ -15,6 +15,8 @@ import SellerDashboard from './components/dashboard/dashboard';
 import ShopPage from './components/shop/ShopPage';
 import ProductPage from './components/product/ProductPage';
 import NotificationPage from './components/notification/NotificationPage';
+import Footer from './components/common/Footer';
+import ScrollToTop from './components/common/ScrollToTop';
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -70,8 +72,11 @@ function App() {
 
   return (
     <Router>
-      <AnimatePresence mode="wait">
-        <Routes>
+      <ScrollToTop />
+      <div className="flex flex-col min-h-screen">
+        <main className="flex-grow">
+          <AnimatePresence mode="wait">
+            <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/shop/:shopId" element={<ShopPage />} />
           <Route path="/product/:productId" element={<ProductPage />} />
@@ -125,8 +130,11 @@ function App() {
             }
           />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AnimatePresence>
+            </Routes>
+          </AnimatePresence>
+        </main>
+        <Footer />
+      </div>
     </Router>
   );
 }
