@@ -1,59 +1,104 @@
-import React, { useState} from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-
+import { supabase } from '../../lib/supabaseClient';
 import Navbar from '../common/Navbar';
 import HeroCarousel from './HeroCarousel';
 import PromoCarousel from './PromoCarousel';
 import FlashSale from './FlashSale';
 import CategoryGrid from './CategoryGrid';
 import FeaturedProducts from './FeaturedProducts';
-
-type Product = {
-	id: number;
-	name: string;
-	price: number;
-	desc?: string;
-};
-
-const sampleProducts: Product[] = [
-	{ id: 1, name: 'Edelweiss Candle', price: 12.99, desc: 'Hand-poured scented candle.' },
-	{ id: 2, name: 'Edelweiss Mug', price: 9.5, desc: 'Ceramic mug with logo.' },
-	{ id: 3, name: 'Edelweiss Tote', price: 14.0, desc: 'Canvas tote bag.' },
-	{ id: 4, name: 'Edelweiss Notebook', price: 7.25, desc: 'Lined notebook, 80 pages.' },
-	{ id: 5, name: 'Edelweiss Sticker Pack', price: 4.5, desc: 'Set of 6 stickers.' },
-	{ id: 6, name: 'Edelweiss Tee', price: 19.99, desc: 'Soft cotton t-shirt.' },
-	{ id: 7, name: 'Edelweiss Tee', price: 19.99, desc: 'Soft cotton t-shirt.' },
-	{ id: 8, name: 'Edelweiss Tee', price: 19.99, desc: 'Soft cotton t-shirt.' },
-	{ id: 9, name: 'Edelweiss Tee', price: 19.99, desc: 'Soft cotton t-shirt.' },
-	{ id: 10, name: 'Edelweiss Tee', price: 19.99, desc: 'Soft cotton t-shirt.' },
-	{ id: 11, name: 'Edelweiss Tee', price: 19.99, desc: 'Soft cotton t-shirt.' },
-	{ id: 12, name: 'Edelweiss Tee', price: 19.99, desc: 'Soft cotton t-shirt.' },
-];
+import type { Product } from './FeaturedProducts';
 
 const HomePage: React.FC = () => {
 	const [cartCount, setCartCount] = useState(0);
+	const [products, setProducts] = useState<Product[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [loadingMore, setLoadingMore] = useState(false);
+	const [hasMore, setHasMore] = useState(true);
+
+	const fetchProducts = async (isInitial = true) => {
+		if (isInitial) setLoading(true);
+		else setLoadingMore(true);
+
+		try {
+			const start = isInitial ? 0 : products.length;
+			const end = start + 9; // Fetch 10 products (inclusive)
+
+			const { data, error } = await supabase
+				.from('products')
+				.select('*')
+				.eq('is_active', true)
+				.order('created_at', { ascending: false })
+				.range(start, end);
+
+			if (error) throw error;
+
+			if (data) {
+				const mappedProducts = data.map((p: any) => ({
+					id: p.id,
+					name: p.name,
+					desc: p.description,
+					price: Number(p.price),
+					image: p.image_urls?.[0] || '',
+					average_rating: p.average_rating,
+					review_count: p.review_count
+				}));
+
+				if (isInitial) {
+					setProducts(mappedProducts);
+				} else {
+					setProducts(prev => [...prev, ...mappedProducts]);
+				}
+
+				// If we got fewer than 10 products, there are no more to fetch
+				if (data.length < 10) {
+					setHasMore(false);
+				}
+			}
+		} catch (err) {
+			console.error('Error fetching products:', err);
+		} finally {
+			if (isInitial) setLoading(false);
+			else setLoadingMore(false);
+		}
+	};
+
+	useEffect(() => {
+		fetchProducts(true);
+	}, []);
+
+	const handleLoadMore = () => {
+		if (!loadingMore && hasMore) {
+			fetchProducts(false);
+		}
+	};
 
 	const addToCart = (p: Product) => {
 		setCartCount((c) => c + 1);
 	};
 
 	return (
-		<motion.div 
-            initial={{ opacity: 0 }}       // Starts invisible
-            animate={{ opacity: 1 }}       // Fades in to visible
-            exit={{ opacity: 0 }}          // Fades out when leaving
-            transition={{ duration: 0.5 }} // Smooth 0.5s transition
-            className="min-h-screen"
-        >
+		<motion.div
+			initial={{ opacity: 0 }}       // Starts invisible
+			animate={{ opacity: 1 }}       // Fades in to visible
+			exit={{ opacity: 0 }}          // Fades out when leaving
+			transition={{ duration: 0.5 }} // Smooth 0.5s transition
+			className="min-h-screen"
+		>
 			<Navbar cartCount={cartCount} />
 
 			<main className="max-w-7/10 mx-auto pt-6">
 				<HeroCarousel />
 				<PromoCarousel />
 				<CategoryGrid />
-				<FlashSale />
-				<FeaturedProducts products={sampleProducts} onAddToCart={addToCart} />
+				<FlashSale products={products.slice(0, 10)} onAddToCart={addToCart} />
+				<FeaturedProducts
+					products={products}
+					onAddToCart={addToCart}
+					onLoadMore={handleLoadMore}
+					hasMore={hasMore}
+					isLoadingMore={loadingMore}
+				/>
 
 
 			</main>

@@ -1,37 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Star, Heart } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+
+import edelweissBanner from '../../assets/promotional_banner/edeweiss_banner.png';
+import launchBanner from '../../assets/promotional_banner/launch_month_special.png';
+import summerBanner from '../../assets/promotional_banner/summer_banner.png';
 
 const HeroCarousel = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const slides = [
-    {
-      id: 1,
-      title: "Beautiful everyday goods",
-      description: "Shop a small curated collection of lifestyle and home items crafted for calm, cozy living.",
-      primaryBtn: "Start shopping",
-      secondaryBtn: "Learn more",
-      icon: <Star className="w-12 h-12 text-pink-300" />,
-      bgColor: "bg-pink-50"
-    },
-    {
-      id: 2,
-      title: "Sustainable & Eco-friendly",
-      description: "Our materials are sourced responsibly. Good for your home, even better for the planet.",
-      primaryBtn: "View Collection",
-      secondaryBtn: "Our Story",
-      icon: <Heart className="w-12 h-12 text-green-300" />,
-      bgColor: "bg-green-50"
-    },
-    {
-      id: 3,
-      title: "New Summer Arrivals",
-      description: "Refresh your space with our latest seasonal drops. Bright colors and airy textures await.",
-      primaryBtn: "Shop New",
-      secondaryBtn: "Lookbook",
-      icon: <ArrowRight className="w-12 h-12 text-blue-300" />,
-      bgColor: "bg-blue-50"
-    }
+    { id: 1, image: edelweissBanner, alt: "Edelweiss Special Banner" },
+    { id: 2, image: launchBanner, alt: "Launch Month Special" },
+    { id: 3, image: summerBanner, alt: "Summer Collection Banner" },
   ];
 
   useEffect(() => {
@@ -41,61 +21,55 @@ const HeroCarousel = () => {
     return () => clearInterval(timer);
   }, [slides.length]);
 
+  const nextSlide = () => setCurrentSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
+  const prevSlide = () => setCurrentSlide((prev) => (prev === 0 ? slides.length - 1 : prev - 1));
+
   return (
-    <section className="relative w-full bg-pink-50 rounded-2xl shadow mb-8 overflow-hidden">
-      
-      {/* SLIDING TRACK 
-         - 'flex' puts items side by side
-         - 'transition-transform' animates the slide
-         - 'translateX' moves the whole track
-      */}
-      <div 
-        className="flex transition-transform duration-700 ease-in-out" 
+    <section className="relative w-full aspect-[16/9] md:aspect-[5/2] bg-pink-50 rounded-[32px] shadow-lg mb-10 overflow-hidden group">
+
+      {/* Sliding Track */}
+      <div
+        className="flex h-full transition-transform duration-1000 ease-in-out"
         style={{ transform: `translateX(-${currentSlide * 100}%)` }}
       >
         {slides.map((slide) => (
-          // Each slide must be 'w-full' and 'flex-shrink-0' to ensure it takes up exactly 100% of the container width
-          <div 
-            key={slide.id} 
-            className="w-full flex-shrink-0 grid grid-cols-1 md:grid-cols-2 gap-8 items-center p-8 min-h-[400px]"
+          <div
+            key={slide.id}
+            className="w-full h-full flex-shrink-0"
           >
-            {/* Text Side */}
-            <div className="p-12">
-              <h1 className="text-4xl font-bold text-pink-600 mb-4 ">
-                {slide.title}
-              </h1>
-              <p className="text-gray-700 mb-6 text-lg">
-                {slide.description}
-              </p>
-              <div className="flex gap-3">
-                <a href="#products" className="px-5 py-3 bg-pink-600 text-white rounded-lg shadow hover:bg-pink-700 transition-colors">
-                  {slide.primaryBtn}
-                </a>
-                <a href="#" className="px-5 py-3 border border-pink-600 text-pink-600 rounded-lg hover:bg-pink-50 transition-colors">
-                  {slide.secondaryBtn}
-                </a>
-              </div>
-            </div>
-
-            {/* Image Side */}
-            <div className="flex items-center justify-center">
-              <div className={`w-64 h-64 ${slide.bgColor} rounded-2xl flex items-center justify-center border border-gray-100 shadow-sm`}>
-                 {slide.icon}
-              </div>
-            </div>
+            <img
+              src={slide.image}
+              alt={slide.alt}
+              className="w-full h-full object-cover"
+            />
           </div>
         ))}
       </div>
 
+      {/* Navigation Arrows */}
+      <button
+        onClick={prevSlide}
+        className="absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/20 backdrop-blur-md border border-white/30 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all hover:bg-white/40 cursor-pointer z-10"
+      >
+        <ChevronLeft size={24} />
+      </button>
+      <button
+        onClick={nextSlide}
+        className="absolute right-6 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/20 backdrop-blur-md border border-white/30 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all hover:bg-white/40 cursor-pointer z-10"
+      >
+        <ChevronRight size={24} />
+      </button>
+
       {/* Navigation Dots */}
-      <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-10">
+      <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-3 z-10">
         {slides.map((_, index) => (
           <button
             key={index}
             onClick={() => setCurrentSlide(index)}
-            className={`w-3 h-3 rounded-full transition-all duration-300 ${
-              currentSlide === index ? "bg-pink-600 w-8" : "bg-gray-300 hover:bg-pink-300"
-            }`}
+            className={`transition-all duration-500 cursor-pointer ${currentSlide === index
+              ? "bg-white w-10 h-2.5 rounded-full"
+              : "bg-white/40 w-2.5 h-2.5 rounded-full hover:bg-white/60"
+              }`}
             aria-label={`Go to slide ${index + 1}`}
           />
         ))}
