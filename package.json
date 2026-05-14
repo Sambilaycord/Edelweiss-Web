@@ -1,5 +1,6 @@
 {
   "name": "edelweiss-web",
+  "homepage": "https://sambilaycord.github.io/Edelweiss-Web/",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,13 +8,16 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1",
     "@tailwindcss/vite": "^4.1.18",
     "canvas-confetti": "^1.9.4",
     "framer-motion": "^12.34.0",
+    "gh-pages": "^6.3.0",
     "lucide-react": "^0.562.0",
     "phil-reg-prov-mun-brgy": "^1.1.0",
     "react": "^19.2.0",
