@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import PhoneInput from 'react-phone-number-input'
-import { Save, Loader2, Phone } from 'lucide-react';
+import { Save, Loader2 } from 'lucide-react';
 import 'react-phone-number-input/style.css'
 import '../../styles/index.css';
 

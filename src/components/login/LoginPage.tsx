@@ -84,7 +84,7 @@ const LoginPage: React.FC = () => {
     const passError = validateField('password', formData.password);
 
     if (emailError || userError || passError) {
-      setError(userError || passError || emailError);
+      setError(userError || passError || emailError || '');
       setLoading(false);
       return;
     }

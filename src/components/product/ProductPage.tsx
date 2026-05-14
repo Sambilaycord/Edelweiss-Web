@@ -402,15 +402,20 @@ const ProductPage: React.FC = () => {
                                             <motion.img
                                                 key={selectedImage}
                                                 custom={slideDirection}
-                                                initial={(direction) => ({
-                                                    x: direction === 'right' ? '100%' : '-100%',
-                                                    opacity: 1
-                                                })}
-                                                animate={{ x: 0, opacity: 1 }}
-                                                exit={(direction) => ({
-                                                    x: direction === 'left' ? '100%' : '-100%',
-                                                    opacity: 1
-                                                })}
+                                                variants={{
+                                                    enter: (direction: string) => ({
+                                                        x: direction === 'right' ? '100%' : '-100%',
+                                                        opacity: 1
+                                                    }),
+                                                    center: { x: 0, opacity: 1 },
+                                                    exit: (direction: string) => ({
+                                                        x: direction === 'left' ? '100%' : '-100%',
+                                                        opacity: 1
+                                                    })
+                                                }}
+                                                initial="enter"
+                                                animate="center"
+                                                exit="exit"
                                                 transition={{ duration: 0.4, ease: 'easeInOut' }}
                                                 src={selectedImage}
                                                 alt={product.name}

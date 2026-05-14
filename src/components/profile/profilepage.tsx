@@ -13,7 +13,7 @@ import WishlistTab from './WishlistTab';
 import OrdersTab from './OrdersTab';
 import { validateField, sanitizeInput } from '../../utils/characterValidation';
 
-import { User, Package, Heart, MapPin, LogOut, Settings, Camera, Loader2, Store, Pencil, Calendar } from 'lucide-react';
+import { User, Package, Heart, MapPin, LogOut, Settings, Loader2, Store, Pencil, Calendar } from 'lucide-react';
 import EditProfileModal from './EditProfileModal';
 
 interface ProfileData {
@@ -75,7 +75,7 @@ const ProfilePage: React.FC = () => {
         if (!session) { navigate('/login'); return; }
         setSessionUser(session.user);
 
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('profiles')
           .select('username, first_name, last_name, phone_number, avatar_url, gender, birthdate, role')
           .eq('id', session.user.id)

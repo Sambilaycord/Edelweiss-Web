@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, Bell, Search, Store } from 'lucide-react';
+import { ShoppingCart, User, Bell, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 
 import logo from '../../assets/logo.png';

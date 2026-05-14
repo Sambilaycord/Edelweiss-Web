@@ -7,7 +7,6 @@ import {
     Edit,
     Trash2,
     X,
-    Upload,
     Loader2,
     CheckCircle2,
     AlertCircle,
@@ -16,7 +15,6 @@ import {
     ToggleRight,
     ChevronLeft,
     ChevronRight,
-    GripVertical,
 } from 'lucide-react';
 
 /* ===== TYPES ===== */

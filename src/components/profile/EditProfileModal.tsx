@@ -17,7 +17,7 @@ interface EditProfileModalProps {
 
 const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, profile, onSuccess }) => {
   const [username, setUsername] = useState(profile.username || '');
-  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || null);
+  const [avatarUrl, _setAvatarUrl] = useState(profile.avatar_url || null);
   const [newFile, setNewFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(profile.avatar_url || null);
   const [loading, setLoading] = useState(false);

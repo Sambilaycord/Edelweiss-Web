@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabaseClient';
-import { ArrowLeft, Store, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Store, Loader2 } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input'; // Added PhoneInput
 import 'react-phone-number-input/style.css'; // Import styles
 import bg from '../../assets/pink_bg.jpg';

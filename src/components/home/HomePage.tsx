@@ -13,7 +13,7 @@ import type { Product } from './FeaturedProducts';
 const HomePage: React.FC = () => {
     const navigate = useNavigate();
 	const [products, setProducts] = useState<Product[]>([]);
-	const [loading, setLoading] = useState(true);
+	const [_loading, setLoading] = useState(true);
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [hasMore, setHasMore] = useState(true);
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Gift, Clock, Cake, Heart, Sparkles, ChevronRight, PartyPopper, Loader2, Flower, GraduationCap, Truck } from 'lucide-react';
+import { Gift, Cake, Heart, Sparkles, ChevronRight, PartyPopper, Loader2, Flower, GraduationCap, Truck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 

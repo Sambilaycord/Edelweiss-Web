@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Truck, ShieldCheck, RefreshCw, Bell, Sparkles } from 'lucide-react';
 
 const PromoCarousel = () => {

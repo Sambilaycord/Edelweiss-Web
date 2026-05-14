@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, Plus, Gift, Trash2, Edit2, Clock, Cake, Heart, Sparkles, Loader2, Info, PartyPopper, Flower, GraduationCap, Truck } from 'lucide-react';
+import { Calendar, Plus, Gift, Trash2, Edit2, Cake, Heart, Sparkles, Loader2, Info, PartyPopper, Flower, GraduationCap, Truck } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import AddReminderModal from '../notification/AddReminderModal';
 
