@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Camera, Pencil, Loader2, User } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
@@ -17,12 +17,18 @@ interface EditProfileModalProps {
 
 const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, profile, onSuccess }) => {
   const [username, setUsername] = useState(profile.username || '');
-  const [avatarUrl, _setAvatarUrl] = useState(profile.avatar_url || null);
+  const avatarUrl = profile.avatar_url || null;
   const [newFile, setNewFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(profile.avatar_url || null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Release blob URLs created for the local preview when they are replaced or the modal unmounts
+  useEffect(() => {
+    if (!previewUrl?.startsWith('blob:')) return;
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -38,6 +44,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, pr
   };
 
   const handleSave = async () => {
+    if (loading) return;
     setLoading(true);
     setError(null);
 
@@ -81,8 +88,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, pr
 
       onSuccess({ username: cleanUsername, avatar_url: finalAvatarUrl });
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Failed to update profile');
+    } catch (err: unknown) {
+      setError(err instanceof Error && err.message ? err.message : 'Failed to update profile');
     } finally {
       setLoading(false);
     }

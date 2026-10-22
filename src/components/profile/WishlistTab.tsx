@@ -5,8 +5,20 @@ import { useNavigate } from 'react-router-dom';
 
 const ITEMS_PER_PAGE = 16;
 
+interface WishlistItem {
+  id: string;
+  product_id: string;
+  products: {
+    id: string;
+    name: string;
+    price: number | null;
+    image_urls: string[] | null;
+    description: string | null;
+  } | null;
+}
+
 const WishlistTab: React.FC = () => {
-  const [wishlist, setWishlist] = useState<any[]>([]);
+  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
@@ -14,70 +26,99 @@ const WishlistTab: React.FC = () => {
   const [totalCount, setTotalCount] = useState(0);
   const navigate = useNavigate();
   const observer = useRef<IntersectionObserver | null>(null);
+  // Items removed since loading started; shifts the offset of later pages so nothing gets skipped
+  const removedCountRef = useRef(0);
+  const removingIdsRef = useRef<Set<string>>(new Set());
 
-  const lastElementRef = useCallback((node: HTMLDivElement) => {
-    if (loading || loadingMore) return;
+  const lastElementRef = useCallback((node: HTMLDivElement | null) => {
     if (observer.current) observer.current.disconnect();
+    if (loading || loadingMore || !hasMore || !node) return;
     observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore) {
+      if (entries[0].isIntersecting) {
+        // Stop observing right away so a single scroll can't request the same page twice
+        observer.current?.disconnect();
+        setLoadingMore(true);
         setPage(prevPage => prevPage + 1);
       }
     });
-    if (node) observer.current.observe(node);
+    observer.current.observe(node);
   }, [loading, loadingMore, hasMore]);
 
-  const fetchWishlist = async (pageNum: number) => {
-    try {
-      if (pageNum === 0) setLoading(true);
-      else setLoadingMore(true);
+  // Disconnect the observer on unmount
+  useEffect(() => () => observer.current?.disconnect(), []);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  useEffect(() => {
+    let cancelled = false;
 
-      const from = pageNum * ITEMS_PER_PAGE;
-      const to = from + ITEMS_PER_PAGE - 1;
+    const fetchWishlist = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
 
-      // Also get total count on first load
-      if (pageNum === 0) {
-        const { count } = await supabase
+        if (page === 0) removedCountRef.current = 0;
+        const from = Math.max(0, page * ITEMS_PER_PAGE - removedCountRef.current);
+        const to = from + ITEMS_PER_PAGE - 1;
+
+        // Also get total count on first load
+        if (page === 0) {
+          const { count, error: countError } = await supabase
+            .from('user_favorites')
+            .select('*', { count: 'exact', head: true })
+            .eq('customer_id', user.id);
+          if (countError) throw countError;
+          if (cancelled) return;
+          setTotalCount(count || 0);
+        }
+
+        const { data, error } = await supabase
           .from('user_favorites')
-          .select('*', { count: 'exact', head: true })
-          .eq('customer_id', user.id);
-        setTotalCount(count || 0);
-      }
-
-      const { data, error } = await supabase
-        .from('user_favorites')
-        .select(`
-          id,
-          product_id,
-          products (
+          .select(`
             id,
-            name,
-            price,
-            image_urls,
-            description
-          )
-        `)
-        .eq('customer_id', user.id)
-        .order('id', { ascending: false }) // Use ID as a stable sort if created_at isn't available or preferred
-        .range(from, to);
+            product_id,
+            products (
+              id,
+              name,
+              price,
+              image_urls,
+              description
+            )
+          `)
+          .eq('customer_id', user.id)
+          .order('id', { ascending: false }) // Use ID as a stable sort if created_at isn't available or preferred
+          .range(from, to);
 
-      if (error) throw error;
+        if (error) throw error;
+        if (cancelled) return;
 
-      if (data) {
-        setWishlist(prev => pageNum === 0 ? data : [...prev, ...data]);
-        setHasMore(data.length === ITEMS_PER_PAGE);
+        const rows = (data as unknown as WishlistItem[] | null) || [];
+        setWishlist(prev => {
+          if (page === 0) return rows;
+          // Skip anything already shown (guards against offset drift)
+          const seen = new Set(prev.map(item => item.id));
+          return [...prev, ...rows.filter(item => !seen.has(item.id))];
+        });
+        setHasMore(rows.length === ITEMS_PER_PAGE);
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Error fetching wishlist:', err);
+          setHasMore(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
-    } catch (err) {
-      console.error('Error fetching wishlist:', err);
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  };
+    };
+
+    fetchWishlist();
+    return () => { cancelled = true; };
+  }, [page]);
 
   const removeFromWishlist = async (favoriteId: string) => {
+    // Ignore repeated clicks while the delete is in flight
+    if (removingIdsRef.current.has(favoriteId)) return;
+    removingIdsRef.current.add(favoriteId);
     try {
       const { error } = await supabase
         .from('user_favorites')
@@ -85,16 +126,20 @@ const WishlistTab: React.FC = () => {
         .eq('id', favoriteId);
 
       if (error) throw error;
+      removedCountRef.current += 1;
       setWishlist(prev => prev.filter(item => item.id !== favoriteId));
       setTotalCount(prev => Math.max(0, prev - 1));
+      // If that was the last loaded item but more exist, pull in the next page
+      if (wishlist.length === 1 && wishlist[0].id === favoriteId && hasMore) {
+        setLoadingMore(true);
+        setPage(prev => prev + 1);
+      }
     } catch (err) {
       console.error('Error removing from wishlist:', err);
+    } finally {
+      removingIdsRef.current.delete(favoriteId);
     }
   };
-
-  useEffect(() => {
-    fetchWishlist(page);
-  }, [page]);
 
   if (loading && page === 0) return (
     <div className="flex justify-center py-20">
@@ -102,7 +147,7 @@ const WishlistTab: React.FC = () => {
     </div>
   );
 
-  if (wishlist.length === 0 && !loading) return (
+  if (wishlist.length === 0 && !loading && !loadingMore) return (
     <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
       <div className="w-20 h-20 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-4">
         <Heart size={32} className="text-pink-300" />

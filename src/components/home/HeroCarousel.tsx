@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-import edelweissBanner from '../../assets/promotional_banner/edeweiss_banner.png';
-import launchBanner from '../../assets/promotional_banner/launch_month_special.png';
-import summerBanner from '../../assets/promotional_banner/summer_banner.png';
+import edelweissBanner from '../../assets/promotional_banner/edeweiss_banner.webp';
+import launchBanner from '../../assets/promotional_banner/launch_month_special.webp';
+import summerBanner from '../../assets/promotional_banner/summer_banner.webp';
 
 const HeroCarousel = () => {
   const [currentSlide, setCurrentSlide] = useState(0);

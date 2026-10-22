@@ -8,11 +8,15 @@ import 'react-phone-number-input/style.css'; // Import styles
 import bg from '../../assets/pink_bg.jpg';
 import '../../styles/index.css';
 
+interface SellerProfile {
+  phone_number: string | null;
+}
+
 const SellerRegistration: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<SellerProfile | null>(null);
 
   // Form States
   const [shopName, setShopName] = useState('');
@@ -20,21 +24,26 @@ const SellerRegistration: React.FC = () => {
   const [description, setDescription] = useState('');
 
   useEffect(() => {
+    let cancelled = false;
     const fetchProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-        if (data) {
+        const { data, error } = await supabase.from('profiles').select('phone_number').eq('id', user.id).maybeSingle();
+        if (error) console.error('Error fetching profile:', error);
+        if (data && !cancelled) {
           setProfile(data);
-          setBusinessPhone(data.phone_number || ''); 
+          // Don't overwrite a number the user already started typing
+          setBusinessPhone(prev => prev || data.phone_number || '');
         }
       }
     };
     fetchProfile();
+    return () => { cancelled = true; };
   }, []);
 
   const handleRegisterShop = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError('');
 
@@ -42,17 +51,29 @@ const SellerRegistration: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Authentication required");
 
-      // 1. Create the Shop Entry
-      const { error: shopError } = await supabase
+      // 1. Create the Shop Entry (skip if a previous attempt already created it,
+      //    e.g. when the role update below failed, to avoid duplicate shops)
+      const { data: existingShop, error: existingError } = await supabase
         .from('shops')
-        .insert([{
-          owner_id: user.id,
-          name: shopName,
-          business_phone: businessPhone || profile?.phone_number,
-          description: description,
-        }]);
+        .select('id')
+        .eq('owner_id', user.id)
+        .limit(1)
+        .maybeSingle();
 
-      if (shopError) throw shopError;
+      if (existingError) throw existingError;
+
+      if (!existingShop) {
+        const { error: shopError } = await supabase
+          .from('shops')
+          .insert([{
+            owner_id: user.id,
+            name: shopName.trim(),
+            business_phone: businessPhone || profile?.phone_number,
+            description: description,
+          }]);
+
+        if (shopError) throw shopError;
+      }
 
       // 2. Update Profile Role
       const { error: profileError } = await supabase
@@ -68,8 +89,8 @@ const SellerRegistration: React.FC = () => {
             message: "Congratulations! Your shop is now live." 
         } 
       });
-    } catch (err: any) {
-      setError(err.message || "Failed to register shop");
+    } catch (err: unknown) {
+      setError(err instanceof Error && err.message ? err.message : "Failed to register shop");
     } finally {
       setLoading(false);
     }
@@ -145,6 +166,7 @@ const SellerRegistration: React.FC = () => {
               </div>
 
               <button 
+                type="submit"
                 disabled={loading} 
                 className="w-full bg-pink-600 text-white py-3 mt-4 rounded-xl font-bold hover:bg-pink-700 transition-all shadow-lg shadow-pink-200 cursor-pointer disabled:opacity-50"
               >

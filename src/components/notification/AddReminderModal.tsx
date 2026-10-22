@@ -3,17 +3,53 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, Loader2, Sparkles, Cake, Heart, PartyPopper, Gift, Flower, GraduationCap, Truck } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 
+interface ReminderToEdit {
+  id: string;
+  name: string;
+  reminder_date: string;
+  description?: string | null;
+  icon_name?: string | null;
+  product_id?: string | null;
+}
+
+interface AttachedProduct {
+  id: string;
+  name: string;
+  image_urls: string[] | null;
+  price: number;
+}
+
 interface AddReminderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  reminderToEdit?: any;
+  reminderToEdit?: ReminderToEdit | null;
   productId?: string;
 }
 
+// Supabase errors aren't always Error instances, so read `message` structurally
+const getErrorMessage = (err: unknown, fallback: string) =>
+  err && typeof err === 'object' && 'message' in err && typeof err.message === 'string' && err.message
+    ? err.message
+    : fallback;
+
+// Local (not UTC) YYYY-MM-DD, so the date picker bounds match the user's calendar day
+const toLocalDateString = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+// Same month/day in another year, clamped so Feb 29 becomes Feb 28 in non-leap years
+const dateInYear = (year: number, month: number, day: number) => {
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return new Date(year, month, Math.min(day, lastDay));
+};
+
 const AddReminderModal: React.FC<AddReminderModalProps> = ({ isOpen, onClose, onSuccess, reminderToEdit, productId }) => {
   const [loading, setLoading] = useState(false);
-  const [attachedProduct, setAttachedProduct] = useState<any>(null);
+  const [attachedProduct, setAttachedProduct] = useState<AttachedProduct | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -33,72 +69,46 @@ const AddReminderModal: React.FC<AddReminderModalProps> = ({ isOpen, onClose, on
     { name: 'truck', icon: Truck },
   ];
 
-  // Fetch product details if productId is provided
+  // Reset the form and (re)load the attached product every time the modal opens.
+  // A single effect avoids the edit/new flows leaving a stale product from a previous open.
   useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+
+    const attachedId = reminderToEdit ? (reminderToEdit.product_id || null) : (productId || null);
+
+    setFormData({
+      name: reminderToEdit?.name || '',
+      description: reminderToEdit?.description || '',
+      reminder_date: reminderToEdit?.reminder_date ? reminderToEdit.reminder_date.split('T')[0] : '',
+      icon_name: reminderToEdit?.icon_name || 'flower',
+      product_id: attachedId
+    });
+    setAttachedProduct(null);
+
     const fetchProduct = async () => {
-      if (!productId) {
-        setAttachedProduct(null);
-        return;
-      }
+      if (!attachedId) return;
       try {
         const { data, error } = await supabase
           .from('products')
           .select('id, name, image_urls, price')
-          .eq('id', productId)
+          .eq('id', attachedId)
           .single();
-        if (!error && data) {
-          setAttachedProduct(data);
-          setFormData(prev => ({ ...prev, product_id: data.id }));
-        }
+        if (cancelled) return;
+        if (error) throw error;
+        if (data) setAttachedProduct(data);
       } catch (err) {
         console.error('Error fetching attached product:', err);
       }
     };
+    fetchProduct();
 
-    if (isOpen) fetchProduct();
-  }, [productId, isOpen]);
-
-  // Handle reminderToEdit product fetch
-  useEffect(() => {
-    const fetchEditProduct = async () => {
-      if (reminderToEdit?.product_id) {
-        try {
-          const { data, error } = await supabase
-            .from('products')
-            .select('id, name, image_urls, price')
-            .eq('id', reminderToEdit.product_id)
-            .single();
-          if (!error && data) setAttachedProduct(data);
-        } catch (err) {
-          console.error('Error fetching edit product:', err);
-        }
-      }
-    };
-    if (isOpen && reminderToEdit) fetchEditProduct();
-  }, [reminderToEdit, isOpen]);
-
-  useEffect(() => {
-    if (reminderToEdit && isOpen) {
-      setFormData({
-        name: reminderToEdit.name || '',
-        description: reminderToEdit.description || '',
-        reminder_date: reminderToEdit.reminder_date ? reminderToEdit.reminder_date.split('T')[0] : '',
-        icon_name: reminderToEdit.icon_name || 'flower',
-        product_id: reminderToEdit.product_id || null
-      });
-    } else if (isOpen) {
-      setFormData({
-        name: '',
-        description: '',
-        reminder_date: '',
-        icon_name: 'flower',
-        product_id: productId || null
-      });
-    }
+    return () => { cancelled = true; };
   }, [reminderToEdit, isOpen, productId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
 
     try {
@@ -128,14 +138,20 @@ const AddReminderModal: React.FC<AddReminderModalProps> = ({ isOpen, onClose, on
       }
 
       onSuccess();
-    } catch (err: any) {
-      alert(err.message || 'An error occurred');
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'An error occurred'));
     } finally {
       setLoading(false);
     }
   };
 
   if (!isOpen) return null;
+
+  const today = new Date();
+  const todayStr = toLocalDateString(today);
+  const maxDate = toLocalDateString(dateInYear(today.getFullYear() + 2, today.getMonth(), today.getDate()));
+  // Reminders recur yearly, so an existing reminder may hold a past date; don't let `min` block saving it.
+  const minDate = formData.reminder_date && formData.reminder_date < todayStr ? formData.reminder_date : todayStr;
 
   return (
     <AnimatePresence>
@@ -232,8 +248,8 @@ const AddReminderModal: React.FC<AddReminderModalProps> = ({ isOpen, onClose, on
                     <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input
                       type="date" required value={formData.reminder_date}
-                      min={new Date().toISOString().split('T')[0]}
-                      max={new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]}
+                      min={minDate}
+                      max={maxDate}
                       onChange={(e) => setFormData({ ...formData, reminder_date: e.target.value })}
                       className="w-full bg-gray-50 border border-transparent rounded-2xl pl-12 pr-5 py-4 focus:ring-2 focus:ring-pink-500 focus:bg-white transition-all outline-none text-gray-800 font-medium appearance-none"
                     />

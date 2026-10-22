@@ -1,6 +1,6 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Timer, ShoppingCart, Image as ImageIcon } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import QuickAddModal from '../common/QuickAddModal';
 
 export type Product = {
@@ -16,21 +16,45 @@ export type Product = {
 
 interface FlashSaleProps {
   products: Product[];
-  onAddToCart?: (product: Product) => void;
 }
+
+/** Whole seconds remaining until the next local midnight, when the daily flash sale resets. */
+const secondsUntilMidnight = () => {
+  const now = new Date();
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  return Math.max(0, Math.ceil((midnight.getTime() - now.getTime()) / 1000));
+};
 
 const FlashSale: React.FC<FlashSaleProps> = ({ products }) => {
   const navigate = useNavigate();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [timeLeft, setTimeLeft] = useState(15791);
+  const [timeLeft, setTimeLeft] = useState(secondsUntilMidnight);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => (prev <= 0 ? 0 : prev - 1));
-    }, 1000);
+    // Recompute from the clock each tick so the countdown stays accurate after the tab sleeps,
+    // and rolls over to the next day's sale at midnight.
+    const timer = setInterval(() => setTimeLeft(secondsUntilMidnight()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Random seed chosen once per mount. Picking with Math.random() during render made the
+  // image change on every re-render (i.e. every second, because of the countdown timer).
+  const [seed] = useState(() => Math.random());
+
+  const displayImages = useMemo(() => {
+    const map = new Map<Product['id'], string | undefined>();
+    products.forEach((p, i) => {
+      const urls = p.image_urls;
+      map.set(
+        p.id,
+        urls && urls.length > 0
+          ? urls[Math.floor(((seed * 9973 + i * 0.6180339887) % 1) * urls.length)]
+          : p.image
+      );
+    });
+    return map;
+  }, [products, seed]);
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
@@ -58,7 +82,7 @@ const FlashSale: React.FC<FlashSaleProps> = ({ products }) => {
               <span>Ends in {formatTime(timeLeft)}</span>
             </div>
           </div>
-          <a href="#" className="text-gray-600 font-medium hover:underline">View All</a>
+          <Link to="/search" className="text-gray-600 font-medium hover:underline">View All</Link>
         </div>
 
         <button
@@ -81,9 +105,7 @@ const FlashSale: React.FC<FlashSaleProps> = ({ products }) => {
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {products.map((p) => {
-            const displayImage = p.image_urls && p.image_urls.length > 0
-              ? p.image_urls[Math.floor(Math.random() * p.image_urls.length)]
-              : p.image;
+            const displayImage = displayImages.get(p.id);
 
             return (
               <div

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 interface SellerOnboardingProps {
   role: 'customer' | 'shop_owner' | 'admin';
-  profile: any;
+  profile: { phone_number?: string | null } | null;
   onSuccess: () => void;
 }
 
@@ -22,6 +22,7 @@ const SellerOnboardingTab: React.FC<SellerOnboardingProps> = ({ role, profile, o
 
   const handleRegisterShop = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError('');
 
@@ -29,17 +30,29 @@ const SellerOnboardingTab: React.FC<SellerOnboardingProps> = ({ role, profile, o
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Authentication required");
 
-      // 1. Create the Shop Entry
-      const { error: shopError } = await supabase
+      // 1. Create the Shop Entry (skip if a previous attempt already created it,
+      //    e.g. when the role update below failed, to avoid duplicate shops)
+      const { data: existingShop, error: existingError } = await supabase
         .from('shops')
-        .insert([{
-          owner_id: user.id,
-          name: shopName,
-          business_phone: businessPhone || profile?.phone_number,
-          description: description,
-        }]);
+        .select('id')
+        .eq('owner_id', user.id)
+        .limit(1)
+        .maybeSingle();
 
-      if (shopError) throw shopError;
+      if (existingError) throw existingError;
+
+      if (!existingShop) {
+        const { error: shopError } = await supabase
+          .from('shops')
+          .insert([{
+            owner_id: user.id,
+            name: shopName.trim(),
+            business_phone: businessPhone || profile?.phone_number,
+            description: description,
+          }]);
+
+        if (shopError) throw shopError;
+      }
 
       // 2. Update Profile Role
       const { error: profileError } = await supabase
@@ -50,8 +63,8 @@ const SellerOnboardingTab: React.FC<SellerOnboardingProps> = ({ role, profile, o
       if (profileError) throw profileError;
 
       onSuccess(); // Trigger parent refresh
-    } catch (err: any) {
-      setError(err.message || "Failed to register shop");
+    } catch (err: unknown) {
+      setError(err instanceof Error && err.message ? err.message : "Failed to register shop");
     } finally {
       setLoading(false);
     }

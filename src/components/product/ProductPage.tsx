@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
+import { useIsOnline } from '../../lib/presence';
 import Navbar from '../common/Navbar';
 import { ArrowLeft, Star, ShoppingBag, Plus, Minus, Store, Loader2, ChevronLeft, ChevronRight, Heart, MessageCircle, Image as ImageIcon, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -20,6 +21,10 @@ interface ShopData {
     shop_logo_url: string | null;
     owner_id: string;
     is_vacation?: boolean;
+    business_phone?: string | null;
+    // Only present if the shops table carries aggregate rating columns
+    average_rating?: number | null;
+    review_count?: number | null;
 }
 
 interface Product {
@@ -37,6 +42,17 @@ interface Product {
     shops?: ShopData; // Supabase joined mapping
 }
 
+type FlashMessage = { text: string, type: 'success' | 'error' };
+
+const formatPeso = (value: number) =>
+    `₱${Number(value).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+
+/** Lowest price a product can be bought for: the cheapest variant when it has variants. */
+const lowestPrice = (product: Product) =>
+    product.product_variants && product.product_variants.length > 0
+        ? Math.min(...product.product_variants.map((v) => Number(v.price)))
+        : Number(product.price);
+
 const ProductPage: React.FC = () => {
     const { productId } = useParams<{ productId: string }>();
     const navigate = useNavigate();
@@ -51,17 +67,39 @@ const ProductPage: React.FC = () => {
     const [quantity, setQuantity] = useState(1);
 
     const [addingToCart, setAddingToCart] = useState(false);
-    const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+    const [message, setMessage] = useState<FlashMessage | null>(null);
     const [isFavorite, setIsFavorite] = useState(false);
     const [favoriteId, setFavoriteId] = useState<string | null>(null);
     const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
     const [showReminderModal, setShowReminderModal] = useState(false);
     const [showSelectionModal, setShowSelectionModal] = useState(false);
+    const [togglingFavorite, setTogglingFavorite] = useState(false);
+
+    // Single timer for auto-dismissing messages, so an older timer can't clear a newer message
+    const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const showMessage = useCallback((msg: FlashMessage | null) => {
+        if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+        messageTimeoutRef.current = null;
+        setMessage(msg);
+        if (msg) {
+            messageTimeoutRef.current = setTimeout(() => setMessage(null), 3000);
+        }
+    }, []);
 
     useEffect(() => {
+        return () => {
+            if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!productId) return;
+        let cancelled = false;
+
         const fetchProductData = async () => {
-            if (!productId) return;
             setLoading(true);
+            setRecommendedProducts([]);
             setProduct(null);
             setIsFavorite(false);
             setFavoriteId(null);
@@ -76,10 +114,12 @@ const ProductPage: React.FC = () => {
                     .select(`
                         *,
                         product_variants (id, name, price, stock),
-                        shops (id, name, shop_logo_url, owner_id, is_vacation)
+                        shops (*)
                     `)
                     .eq('id', productId)
                     .single();
+
+                if (cancelled) return;
 
                 if (error || !data) {
                     console.error('Product not found or error loading.');
@@ -110,34 +150,46 @@ const ProductPage: React.FC = () => {
                     .order('created_at', { ascending: false })
                     .limit(5);
 
-                if (!recError && recData) {
+                if (cancelled) return;
+
+                if (recError) {
+                    console.error('Failed to load recommended products:', recError);
+                } else if (recData) {
                     setRecommendedProducts(recData);
                 }
 
                 // Check Favorite Status
                 const { data: { user } } = await supabase.auth.getUser();
+                if (cancelled) return;
                 if (user) {
-                    const { data: favData } = await supabase
+                    const { data: favData, error: favError } = await supabase
                         .from('user_favorites')
                         .select('id')
                         .eq('customer_id', user.id)
                         .eq('product_id', productId)
                         .maybeSingle();
-                    
+
+                    if (cancelled) return;
+                    if (favError) console.error('Failed to load favorite status:', favError);
+
                     if (favData) {
                         setIsFavorite(true);
                         setFavoriteId(favData.id);
                     }
                 }
 
-            } catch (err) {
-                console.error("Failed to load product page details:", err);
+            } catch (err: unknown) {
+                if (!cancelled) console.error("Failed to load product page details:", err);
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
         };
 
         fetchProductData();
+
+        return () => {
+            cancelled = true;
+        };
     }, [productId, navigate]);
 
     // Active Display Logic
@@ -146,32 +198,7 @@ const ProductPage: React.FC = () => {
     const isOutOfStock = maxStock <= 0;
 
     // Realtime Presence State
-    const [isShopOnline, setIsShopOnline] = useState(false);
-
-    useEffect(() => {
-        if (!product?.shops?.owner_id) return;
-        const ownerId = product.shops.owner_id;
-
-        const channel = supabase.channel('global_presence');
-
-        channel.on('presence', { event: 'sync' }, () => {
-            const newState = channel.presenceState();
-            let online = false;
-            for (const [, presences] of Object.entries(newState)) {
-                for (const p of presences as any[]) {
-                    if (p.user_id === ownerId) {
-                        online = true;
-                        break;
-                    }
-                }
-            }
-            setIsShopOnline(online);
-        }).subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [product?.shops?.owner_id]);
+    const isShopOnline = useIsOnline(product?.shops?.owner_id);
 
     // Image Navigation Handlers
     const handlePrevImage = () => {
@@ -230,28 +257,29 @@ const ProductPage: React.FC = () => {
     };
 
     const handleAddToCart = async () => {
-        setMessage(null);
+        if (!product || isOutOfStock || addingToCart) return;
 
-        const { data: { user } } = await supabase.auth.getUser();
-
-        // Block 1: Redirect to login if unauthenticated
-        if (!user) {
-            navigate('/login');
-            return;
-        }
-
-        if (!product || isOutOfStock) return;
-
+        showMessage(null);
         setAddingToCart(true);
 
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+
+            // Block 1: Redirect to login if unauthenticated
+            if (!user) {
+                navigate('/login');
+                return;
+            }
+
             // Check for existing cart
             let cartId = null;
-            const { data: existingCart } = await supabase
+            const { data: existingCart, error: cartError } = await supabase
                 .from('carts')
                 .select('id')
                 .eq('customer_id', user.id)
                 .maybeSingle();
+
+            if (cartError) throw cartError;
 
             if (existingCart) {
                 cartId = existingCart.id;
@@ -270,18 +298,22 @@ const ProductPage: React.FC = () => {
             if (!cartId) throw new Error("Could not initialize Cart.");
 
             // Check if product is already in cart items
-            const { data: existingItem } = await supabase
+            // `.eq(col, null)` never matches in PostgREST, so null variants must use `.is()`
+            let itemQuery = supabase
                 .from('cart_items')
                 .select('id, quantity')
                 .eq('cart_id', cartId)
-                .eq('product_id', product.id)
-                .eq('variant_id', selectedVariant?.id || null)
-                .maybeSingle();
+                .eq('product_id', product.id);
+            itemQuery = selectedVariant
+                ? itemQuery.eq('variant_id', selectedVariant.id)
+                : itemQuery.is('variant_id', null);
+
+            const { data: existingItem, error: itemError } = await itemQuery.maybeSingle();
+            if (itemError) throw itemError;
 
             if (existingItem) {
-                // Update quantity
-                // Note: Assuming Variant changes aren't tracked natively in `cart_items` for now.
-                const newQuantity = existingItem.quantity + quantity;
+                // Update quantity (never beyond available stock)
+                const newQuantity = Math.min(existingItem.quantity + quantity, maxStock);
                 const { error: updateError } = await supabase
                     .from('cart_items')
                     .update({ quantity: newQuantity })
@@ -302,29 +334,27 @@ const ProductPage: React.FC = () => {
                 if (insertError) throw insertError;
             }
 
-            setMessage({ text: 'Added to your bag!', type: 'success' });
+            showMessage({ text: 'Added to your bag!', type: 'success' });
 
-        } catch (error) {
+        } catch (error: unknown) {
             console.error("Error adding to cart:", error);
-            setMessage({ text: 'Failed to add item. Please try again.', type: 'error' });
+            showMessage({ text: 'Failed to add item. Please try again.', type: 'error' });
         } finally {
             setAddingToCart(false);
-
-            // Clear success message after 3 seconds
-            setTimeout(() => {
-                setMessage(null);
-            }, 3000);
         }
     };
 
     const handleToggleFavorite = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-            navigate('/login');
-            return;
-        }
+        if (!product || togglingFavorite) return;
+        setTogglingFavorite(true);
 
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                navigate('/login');
+                return;
+            }
+
             if (isFavorite && favoriteId) {
                 // Remove
                 const { error } = await supabase
@@ -335,14 +365,14 @@ const ProductPage: React.FC = () => {
                 if (error) throw error;
                 setIsFavorite(false);
                 setFavoriteId(null);
-                setMessage({ text: 'Removed from favorites', type: 'error' });
+                showMessage({ text: 'Removed from favorites', type: 'error' });
             } else {
                 // Add
                 const { data, error } = await supabase
                     .from('user_favorites')
                     .insert({
                         customer_id: user.id,
-                        product_id: productId
+                        product_id: product.id
                     })
                     .select('id')
                     .single();
@@ -350,13 +380,13 @@ const ProductPage: React.FC = () => {
                 if (error) throw error;
                 setIsFavorite(true);
                 setFavoriteId(data.id);
-                setMessage({ text: 'Added to favorites!', type: 'success' });
+                showMessage({ text: 'Added to favorites!', type: 'success' });
             }
-        } catch (err) {
+        } catch (err: unknown) {
             console.error("Wishlist error:", err);
-            setMessage({ text: 'Error updating wishlist', type: 'error' });
+            showMessage({ text: 'Error updating wishlist', type: 'error' });
         } finally {
-            setTimeout(() => setMessage(null), 3000);
+            setTogglingFavorite(false);
         }
     };
 
@@ -618,6 +648,7 @@ const ProductPage: React.FC = () => {
                                     {/* Wishlist Button */}
                                     <button
                                         onClick={handleToggleFavorite}
+                                        disabled={togglingFavorite}
                                         className={`h-14 w-14 sm:w-16 flex items-center justify-center transition-all focus:outline-none hover:scale-110 active:scale-95 flex-shrink-0 ${isFavorite
                                             ? 'text-pink-500'
                                             : 'text-pink-500 hover:text-pink-600'
@@ -679,17 +710,36 @@ const ProductPage: React.FC = () => {
                                 </div>
                                 <p className="text-gray-500 text-sm mt-1 flex items-center gap-1">
                                     <Star size={14} className="text-yellow-500 fill-yellow-500" />
-                                    {product.review_count !== undefined && product.review_count > 0
-                                        ? `${Number(product.average_rating || 0).toFixed(1)} Product Rating`
-                                        : "New Shop"}
+                                    {product.shops.review_count != null && product.shops.review_count > 0
+                                        ? `${Number(product.shops.average_rating || 0).toFixed(1)} Shop Rating (${product.shops.review_count})`
+                                        : product.review_count !== undefined && product.review_count > 0
+                                            ? `${Number(product.average_rating || 0).toFixed(1)} Product Rating`
+                                            : 'No ratings yet'}
                                 </p>
                             </div>
                         </div>
                         <div className="flex items-center gap-3 w-full sm:w-auto">
-                            <button className="flex-1 sm:flex-none px-6 py-2.5 border-2 border-pink-600 text-pink-600 font-bold rounded-xl hover:bg-pink-50 transition-colors focus:outline-none flex items-center justify-center gap-2">
-                                <MessageCircle size={18} />
-                                Message
-                            </button>
+                            {product.shops.business_phone ? (
+                                <a
+                                    href={`tel:${product.shops.business_phone.replace(/[^\d+]/g, '')}`}
+                                    title={`Call ${product.shops.name} at ${product.shops.business_phone}`}
+                                    className="flex-1 sm:flex-none px-6 py-2.5 border-2 border-pink-600 text-pink-600 font-bold rounded-xl hover:bg-pink-50 transition-colors focus:outline-none flex items-center justify-center gap-2"
+                                >
+                                    <MessageCircle size={18} />
+                                    Contact
+                                </a>
+                            ) : (
+                                <span title="This shop hasn't added contact details yet" className="flex-1 sm:flex-none flex">
+                                    <button
+                                        type="button"
+                                        disabled
+                                        className="w-full px-6 py-2.5 border-2 border-gray-200 text-gray-400 font-bold rounded-xl cursor-not-allowed pointer-events-none flex items-center justify-center gap-2"
+                                    >
+                                        <MessageCircle size={18} />
+                                        Contact
+                                    </button>
+                                </span>
+                            )}
                             <button
                                 onClick={() => navigate(`/shop/${product.shop_id}`)}
                                 className="flex-1 sm:flex-none px-6 py-2.5 bg-pink-600 text-white font-bold rounded-xl hover:bg-pink-700 transition-colors shadow-sm focus:outline-none flex items-center justify-center gap-2"
@@ -732,8 +782,7 @@ const ProductPage: React.FC = () => {
                         }}
                         onSuccess={(msg) => {
                             setShowSelectionModal(false);
-                            setMessage({ text: msg, type: 'success' });
-                            setTimeout(() => setMessage(null), 3000);
+                            showMessage({ text: msg, type: 'success' });
                         }}
                         productId={product.id}
                     />
@@ -742,8 +791,7 @@ const ProductPage: React.FC = () => {
                         onClose={() => setShowReminderModal(false)}
                         onSuccess={() => {
                             setShowReminderModal(false);
-                            setMessage({ text: 'Reminder set successfully!', type: 'success' });
-                            setTimeout(() => setMessage(null), 3000);
+                            showMessage({ text: 'Reminder set successfully!', type: 'success' });
                         }}
                         productId={product.id}
                     />
@@ -811,7 +859,7 @@ const RecommendedProductCard = ({ product }: { product: Product }) => {
                 <div className="mt-auto pt-3 border-t border-gray-50 flex items-center justify-between">
                     <span className="text-pink-600 font-medium text-base md:text-lg">
                         {hasVariants && <span className="text-gray-400 font-medium text-xs mr-1">from</span>}
-                        ₱{Number(product.price).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                        {formatPeso(lowestPrice(product))}
                     </span>
 
                     {product.review_count !== undefined && product.review_count > 0 && (

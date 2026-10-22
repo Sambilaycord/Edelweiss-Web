@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, Plus, Gift, Trash2, Edit2, Cake, Heart, Sparkles, Loader2, Info, PartyPopper, Flower, GraduationCap, Truck } from 'lucide-react';
@@ -28,9 +28,8 @@ const RemindersTab: React.FC = () => {
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [showInfo, setShowInfo] = useState(false);
 
-  const fetchReminders = async () => {
+  const fetchReminders = useCallback(async () => {
     try {
-      setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -47,11 +46,11 @@ const RemindersTab: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchReminders();
-  }, []);
+  }, [fetchReminders]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this reminder?')) return;
@@ -73,6 +72,11 @@ const RemindersTab: React.FC = () => {
     setEditingReminder(null);
     setShowModal(true);
   };
+
+  // Date-only strings ("YYYY-MM-DD") are parsed as UTC by `new Date`, which shows the
+  // previous day in timezones behind UTC. Parse them as local dates instead.
+  const parseReminderDate = (value: string) =>
+    /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : new Date(value);
 
   const renderIcon = (name: string | undefined, size = 24, className = "") => {
     switch (name) {
@@ -152,7 +156,7 @@ const RemindersTab: React.FC = () => {
                     <h4 className="font-medium text-gray-900 text-lg">{reminder.name}</h4>
                     <p className="text-pink-600 text-sm font-medium flex items-center gap-1.5">
                       <Calendar size={14} />
-                      {new Date(reminder.reminder_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                      {parseReminderDate(reminder.reminder_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                     </p>
                     {reminder.description && (
                       <p className="text-gray-500 text-sm italic pr-4">{reminder.description}</p>

@@ -46,18 +46,48 @@ interface ProductsTabProps {
     shopId: string;
     initialAction?: string | null;
     onClearAction?: () => void;
+    onProductsChanged?: () => void;
 }
 
 const BUCKET = 'public-media';
 
+// Supabase errors aren't always Error instances, so read `message` structurally
+const getErrorMessage = (err: unknown, fallback: string) =>
+    err && typeof err === 'object' && 'message' in err && typeof err.message === 'string' && err.message
+        ? err.message
+        : fallback;
+
+// Extract the object path inside BUCKET from a public URL, or null if it isn't ours
+const getStoragePath = (publicUrl: string): string | null => {
+    const marker = `/storage/v1/object/public/${BUCKET}/`;
+    const idx = publicUrl.indexOf(marker);
+    if (idx === -1) return null;
+    return decodeURIComponent(publicUrl.slice(idx + marker.length).split('?')[0]);
+};
+
+const queryProducts = (shopId: string) =>
+    supabase
+        .from('products')
+        .select('*, product_variants(*)')
+        .eq('shop_id', shopId)
+        .order('created_at', { ascending: false })
+        .returns<Product[]>();
+
+// Best-effort cleanup of storage objects; failures are logged, not surfaced
+const removeStorageFiles = async (paths: string[]) => {
+    if (paths.length === 0) return;
+    const { error } = await supabase.storage.from(BUCKET).remove(paths);
+    if (error) console.error('Failed to remove product images from storage:', error);
+};
+
 /* ===== MAIN COMPONENT ===== */
-const ProductsTab: React.FC<ProductsTabProps> = ({ shopId, initialAction, onClearAction }) => {
+const ProductsTab: React.FC<ProductsTabProps> = ({ shopId, initialAction, onClearAction, onProductsChanged }) => {
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Modal state
-    const [showModal, setShowModal] = useState(false);
+    // Modal state (opens immediately when the dashboard asked for "add product")
+    const [showModal, setShowModal] = useState(initialAction === 'add_product');
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
     // Delete confirmation
@@ -67,61 +97,86 @@ const ProductsTab: React.FC<ProductsTabProps> = ({ shopId, initialAction, onClea
     // Toast
     const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-    const showToast = useCallback((type: 'success' | 'error', message: string) => {
-        setToast({ type, message });
-        setTimeout(() => setToast(null), 4000);
+    const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => () => {
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     }, []);
 
-    // Fetch products
-    const fetchProducts = useCallback(async () => {
-        setLoading(true);
-        const { data, error } = await supabase
-            .from('products')
-            .select('*, product_variants(*)')
-            .eq('shop_id', shopId)
-            .order('created_at', { ascending: false });
+    // A newer toast resets the timer instead of being dismissed early by an older one
+    const showToast = useCallback((type: 'success' | 'error', message: string) => {
+        setToast({ type, message });
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setToast(null), 4000);
+    }, []);
 
-        if (!error && data) setProducts(data);
+    // Fetch products (keeps the current list visible while refreshing)
+    const applyFetchResult = useCallback((result: Awaited<ReturnType<typeof queryProducts>>) => {
+        if (result.error) {
+            console.error('Error fetching products:', result.error);
+            showToast('error', 'Failed to load products.');
+        } else if (result.data) {
+            setProducts(result.data);
+        }
         setLoading(false);
-    }, [shopId]);
+    }, [showToast]);
 
-    useEffect(() => { fetchProducts(); }, [fetchProducts]);
+    const fetchProducts = useCallback(async () => {
+        applyFetchResult(await queryProducts(shopId));
+    }, [shopId, applyFetchResult]);
 
     useEffect(() => {
-        if (initialAction === 'add_product') {
-            setEditingProduct(null);
-            setShowModal(true);
-            onClearAction?.();
-        }
+        let cancelled = false;
+        queryProducts(shopId).then(result => {
+            if (!cancelled) applyFetchResult(result);
+        });
+        return () => { cancelled = true; };
+    }, [shopId, applyFetchResult]);
+
+    // The "add product" request was consumed by the initial modal state; clear it in the parent
+    useEffect(() => {
+        if (initialAction === 'add_product') onClearAction?.();
     }, [initialAction, onClearAction]);
 
     // Toggle active status
+    const [togglingId, setTogglingId] = useState<string | null>(null);
     const toggleActive = async (product: Product) => {
+        if (togglingId) return;
+        setTogglingId(product.id);
         const { error } = await supabase
             .from('products')
             .update({ is_active: !product.is_active })
             .eq('id', product.id);
+        setTogglingId(null);
 
         if (!error) {
-            setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_active: !p.is_active } : p));
+            setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_active: !product.is_active } : p));
             showToast('success', `Product ${!product.is_active ? 'activated' : 'deactivated'}.`);
+        } else {
+            console.error(error);
+            showToast('error', 'Failed to update product status.');
         }
     };
 
     // Delete product
     const handleDelete = async () => {
-        if (!deleteTarget) return;
+        if (!deleteTarget || deleting) return;
+        const target = deleteTarget;
         setDeleting(true);
 
         const { error } = await supabase
             .from('products')
             .delete()
-            .eq('id', deleteTarget.id);
+            .eq('id', target.id);
 
         if (!error) {
-            setProducts(prev => prev.filter(p => p.id !== deleteTarget.id));
+            setProducts(prev => prev.filter(p => p.id !== target.id));
             showToast('success', 'Product deleted.');
+            onProductsChanged?.();
+            // Clean up the product's images in storage (not referenced anywhere else)
+            const paths = (target.image_urls || []).map(getStoragePath).filter((p): p is string => !!p);
+            removeStorageFiles(paths);
         } else {
+            console.error(error);
             showToast('error', 'Failed to delete product.');
         }
 
@@ -131,7 +186,7 @@ const ProductsTab: React.FC<ProductsTabProps> = ({ shopId, initialAction, onClea
 
     // Filter products
     const filtered = products.filter(p =>
-        p.name.toLowerCase().includes(searchQuery.toLowerCase())
+        (p.name || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     return (
@@ -217,6 +272,7 @@ const ProductsTab: React.FC<ProductsTabProps> = ({ shopId, initialAction, onClea
                         setShowModal(false);
                         setEditingProduct(null);
                         fetchProducts();
+                        onProductsChanged?.();
                         showToast('success', editingProduct ? 'Product updated!' : 'Product added!');
                     }}
                     showToast={showToast}
@@ -355,12 +411,22 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
     const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Revoke blob preview URLs when the modal unmounts
+    const newImagePreviewsRef = useRef<string[]>([]);
+    useEffect(() => { newImagePreviewsRef.current = newImagePreviews; }, [newImagePreviews]);
+    useEffect(() => () => {
+        newImagePreviewsRef.current.forEach(url => URL.revokeObjectURL(url));
+    }, []);
+
     // Image carousel index for preview
     const allPreviews = [...existingImages, ...newImagePreviews];
     const [previewIndex, setPreviewIndex] = useState(0);
+    const safePreviewIndex = Math.min(previewIndex, Math.max(0, allPreviews.length - 1));
 
     const handleAddImages = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
+        // Reset so re-selecting the same file(s) still fires onChange, even on early return
+        if (fileInputRef.current) fileInputRef.current.value = '';
         const validFiles = files.filter(f => {
             if (!f.type.startsWith('image/')) return false;
             if (f.size > 5 * 1024 * 1024) return false;
@@ -380,25 +446,41 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
         const previews = validFiles.map(f => URL.createObjectURL(f));
         setNewImageFiles(prev => [...prev, ...validFiles]);
         setNewImagePreviews(prev => [...prev, ...previews]);
+    };
 
-        if (fileInputRef.current) fileInputRef.current.value = '';
+    // Keep the carousel on the same image when one before it is removed, and in range otherwise
+    const adjustPreviewAfterRemoval = (removedIndex: number) => {
+        const newLength = allPreviews.length - 1;
+        setPreviewIndex(i => {
+            const next = removedIndex < i ? i - 1 : i;
+            return Math.max(0, Math.min(next, newLength - 1));
+        });
     };
 
     const removeExistingImage = (index: number) => {
         setExistingImages(prev => prev.filter((_, i) => i !== index));
-        if (previewIndex >= allPreviews.length - 1) setPreviewIndex(Math.max(0, previewIndex - 1));
+        adjustPreviewAfterRemoval(index);
     };
 
     const removeNewImage = (index: number) => {
+        const url = newImagePreviews[index];
+        if (url) URL.revokeObjectURL(url);
         setNewImageFiles(prev => prev.filter((_, i) => i !== index));
         setNewImagePreviews(prev => prev.filter((_, i) => i !== index));
-        if (previewIndex >= allPreviews.length - 1) setPreviewIndex(Math.max(0, previewIndex - 1));
+        adjustPreviewAfterRemoval(existingImages.length + index);
+    };
+
+    const updateVariant = (index: number, changes: Partial<ProductVariant>) => {
+        // Immutable update: the variant objects may be shared with the parent's product list
+        setVariants(prev => prev.map((v, i) => i === index ? { ...v, ...changes } : v));
     };
 
     const handleSave = async () => {
+        if (saving) return;
         const isUsingVariants = hasVariants && variants.length > 0;
 
         if (!name.trim()) { showToast('error', 'Product name is required.'); return; }
+        if (hasVariants && variants.length === 0) { showToast('error', 'Add at least one variant or turn off variants.'); return; }
         if (!isUsingVariants && (!price || parseFloat(price) < 0)) { showToast('error', 'Enter a valid base price.'); return; }
         if (!isUsingVariants && (!stock || parseInt(stock) < 0)) { showToast('error', 'Enter a valid base stock quantity.'); return; }
 
@@ -412,6 +494,10 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
         }
 
         setSaving(true);
+
+        // Track uploads so they can be removed if the save fails part-way
+        const uploadedPaths: string[] = [];
+        let productSaved = false;
 
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -428,6 +514,7 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
                     .upload(fileName, file, { upsert: true });
 
                 if (uploadError) throw uploadError;
+                uploadedPaths.push(fileName);
 
                 const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
                 uploadedUrls.push(urlData.publicUrl);
@@ -470,6 +557,7 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
                 if (error) throw error;
                 savedProductId = newProd.id;
             }
+            productSaved = true;
 
             // Sync variants
             if (savedProductId) {
@@ -479,7 +567,8 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
                         const currentVariantIds = variants.map(v => v.id).filter(Boolean);
                         const deletedVariants = product.product_variants.filter(v => !currentVariantIds.includes(v.id));
                         if (deletedVariants.length > 0) {
-                            await supabase.from('product_variants').delete().in('id', deletedVariants.map(v => v.id));
+                            const { error: deleteError } = await supabase.from('product_variants').delete().in('id', deletedVariants.map(v => v.id));
+                            if (deleteError) throw deleteError;
                         }
                     }
 
@@ -494,7 +583,8 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
                         is_active: v.is_active ?? true,
                     }));
 
-                    const newVariants = variantsToUpsert.filter(v => !v.id).map(({id, ...rest}) => rest);
+                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                    const newVariants = variantsToUpsert.filter(v => !v.id).map(({ id, ...rest }) => rest);
                     const updateVariants = variantsToUpsert.filter(v => v.id);
 
                     if (newVariants.length > 0) {
@@ -510,15 +600,27 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
                 } else {
                     // Variants disabled, wipe them out
                     if (isEditing) {
-                        await supabase.from('product_variants').delete().eq('product_id', savedProductId);
+                        const { error: wipeError } = await supabase.from('product_variants').delete().eq('product_id', savedProductId);
+                        if (wipeError) throw wipeError;
                     }
                 }
             }
 
+            // Images the seller removed while editing are no longer referenced; clean them up
+            if (isEditing && product?.image_urls) {
+                const removedPaths = product.image_urls
+                    .filter(url => !existingImages.includes(url))
+                    .map(getStoragePath)
+                    .filter((p): p is string => !!p);
+                removeStorageFiles(removedPaths);
+            }
+
             onSaved();
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            showToast('error', err.message || 'Failed to save product.');
+            // Uploaded files never got attached to a product row; don't leave them orphaned
+            if (!productSaved) removeStorageFiles(uploadedPaths);
+            showToast('error', getErrorMessage(err, 'Failed to save product.'));
         } finally {
             setSaving(false);
         }
@@ -631,11 +733,7 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
                                                 <input
                                                     type="text"
                                                     value={variant.name || ''}
-                                                    onChange={(e) => {
-                                                        const newVariants = [...variants];
-                                                        newVariants[index].name = e.target.value;
-                                                        setVariants(newVariants);
-                                                    }}
+                                                    onChange={(e) => updateVariant(index, { name: e.target.value })}
                                                     placeholder="Variant Name (e.g. Small, Red)"
                                                     className="w-full px-3 py-2 border border-gray-200 rounded-md focus:ring-1 focus:ring-pink-500 outline-none text-xs"
                                                 />
@@ -643,22 +741,14 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
                                                     <input
                                                         type="number"
                                                         value={variant.price === undefined ? '' : variant.price}
-                                                        onChange={(e) => {
-                                                            const newVariants = [...variants];
-                                                            newVariants[index].price = e.target.value ? parseFloat(e.target.value) : undefined;
-                                                            setVariants(newVariants);
-                                                        }}
+                                                        onChange={(e) => updateVariant(index, { price: e.target.value ? parseFloat(e.target.value) : undefined })}
                                                         placeholder="Price ₱"
                                                         className="w-1/2 px-3 py-2 border border-gray-200 rounded-md focus:ring-1 focus:ring-pink-500 outline-none text-xs"
                                                     />
                                                     <input
                                                         type="number"
                                                         value={variant.stock === undefined ? '' : variant.stock}
-                                                        onChange={(e) => {
-                                                            const newVariants = [...variants];
-                                                            newVariants[index].stock = e.target.value ? parseInt(e.target.value) : undefined;
-                                                            setVariants(newVariants);
-                                                        }}
+                                                        onChange={(e) => updateVariant(index, { stock: e.target.value ? parseInt(e.target.value) : undefined })}
                                                         placeholder="Stock"
                                                         className="w-1/2 px-3 py-2 border border-gray-200 rounded-md focus:ring-1 focus:ring-pink-500 outline-none text-xs"
                                                     />
@@ -704,26 +794,26 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
                                 {allPreviews.length > 0 ? (
                                     <>
                                         <img
-                                            src={allPreviews[previewIndex]}
+                                            src={allPreviews[safePreviewIndex]}
                                             alt="Preview"
                                             className="w-full h-full object-cover"
                                         />
                                         {allPreviews.length > 1 && (
                                             <>
                                                 <button
-                                                    onClick={() => setPreviewIndex(p => (p - 1 + allPreviews.length) % allPreviews.length)}
+                                                    onClick={() => setPreviewIndex((safePreviewIndex - 1 + allPreviews.length) % allPreviews.length)}
                                                     className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/40 hover:bg-black/60 text-white rounded-full flex items-center justify-center cursor-pointer transition-colors"
                                                 >
                                                     <ChevronLeft size={16} />
                                                 </button>
                                                 <button
-                                                    onClick={() => setPreviewIndex(p => (p + 1) % allPreviews.length)}
+                                                    onClick={() => setPreviewIndex((safePreviewIndex + 1) % allPreviews.length)}
                                                     className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/40 hover:bg-black/60 text-white rounded-full flex items-center justify-center cursor-pointer transition-colors"
                                                 >
                                                     <ChevronRight size={16} />
                                                 </button>
                                                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white text-[10px] px-2.5 py-1 rounded-full font-medium">
-                                                    {previewIndex + 1} / {allPreviews.length}
+                                                    {safePreviewIndex + 1} / {allPreviews.length}
                                                 </div>
                                             </>
                                         )}
@@ -745,7 +835,7 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
                                     <div key={`existing-${i}`} className="relative group">
                                         <button
                                             onClick={() => setPreviewIndex(i)}
-                                            className={`w-14 h-14 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${previewIndex === i ? 'border-pink-500 shadow-md' : 'border-gray-200 hover:border-pink-300'}`}
+                                            className={`w-14 h-14 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${safePreviewIndex === i ? 'border-pink-500 shadow-md' : 'border-gray-200 hover:border-pink-300'}`}
                                         >
                                             <img src={url} alt="" className="w-full h-full object-cover" />
                                         </button>
@@ -761,7 +851,7 @@ const ProductModal = ({ shopId, product, onClose, onSaved, showToast }: {
                                     <div key={`new-${i}`} className="relative group">
                                         <button
                                             onClick={() => setPreviewIndex(existingImages.length + i)}
-                                            className={`w-14 h-14 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${previewIndex === existingImages.length + i ? 'border-pink-500 shadow-md' : 'border-gray-200 hover:border-pink-300'}`}
+                                            className={`w-14 h-14 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${safePreviewIndex === existingImages.length + i ? 'border-pink-500 shadow-md' : 'border-gray-200 hover:border-pink-300'}`}
                                         >
                                             <img src={url} alt="" className="w-full h-full object-cover" />
                                         </button>

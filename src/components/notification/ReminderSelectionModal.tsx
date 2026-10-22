@@ -11,11 +11,17 @@ interface ReminderSelectionModalProps {
   productId: string;
 }
 
+// Parse YYYY-MM-DD as a local date (new Date('YYYY-MM-DD') is UTC and can show the previous day)
+const parseLocalDate = (value: string) => {
+  const [y, m, d] = value.split('T')[0].split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+};
+
 interface Reminder {
   id: string;
   name: string;
   reminder_date: string;
-  icon_name: string;
+  icon_name: string | null;
   product_id?: string | null;
 }
 
@@ -40,8 +46,10 @@ const ReminderSelectionModal: React.FC<ReminderSelectionModalProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+
     const fetchReminders = async () => {
-      if (!isOpen) return;
       setLoading(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -53,18 +61,21 @@ const ReminderSelectionModal: React.FC<ReminderSelectionModalProps> = ({
           .eq('customer_id', user.id)
           .order('reminder_date', { ascending: true });
 
-        if (!error) setReminders(data || []);
+        if (error) throw error;
+        if (!cancelled) setReminders(data || []);
       } catch (err) {
         console.error('Error fetching reminders:', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchReminders();
+    return () => { cancelled = true; };
   }, [isOpen]);
 
   const performUpdate = async (reminderId: string, reminderName: string) => {
+    if (updating) return;
     setUpdating(reminderId);
     try {
       const { error } = await supabase
@@ -77,6 +88,7 @@ const ReminderSelectionModal: React.FC<ReminderSelectionModalProps> = ({
       onClose();
     } catch (err) {
       console.error('Error updating reminder:', err);
+      alert('Failed to add the gift to this reminder. Please try again.');
     } finally {
       setUpdating(null);
     }
@@ -193,7 +205,7 @@ const ReminderSelectionModal: React.FC<ReminderSelectionModalProps> = ({
                                 <div className="flex items-center gap-2 mt-0.5">
                                   <p className="text-[10px] font-medium text-gray-400 flex items-center gap-1">
                                     <Calendar size={10} />
-                                    {new Date(reminder.reminder_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                    {parseLocalDate(reminder.reminder_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                   </p>
                                   {reminder.product_id && (
                                     <span className="text-[8px] font-black bg-pink-100 text-pink-600 px-1.5 py-0.5 rounded-md uppercase tracking-wider">Gift Attached</span>

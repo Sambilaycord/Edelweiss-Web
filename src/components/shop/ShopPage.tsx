@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Store, Search, Package, Image as ImageIcon, Star, MessageCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import { useIsOnline } from '../../lib/presence';
 import Navbar from '../common/Navbar';
 
 interface ShopData {
@@ -32,6 +33,15 @@ interface Product {
     product_variants?: { price: number; stock: number }[];
 }
 
+const formatPeso = (value: number) =>
+    `₱${Number(value).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+
+/** Lowest price a product can be bought for: the cheapest variant when it has variants. */
+const lowestPrice = (product: Product) =>
+    product.product_variants && product.product_variants.length > 0
+        ? Math.min(...product.product_variants.map((v) => Number(v.price)))
+        : Number(product.price);
+
 const ShopPage: React.FC = () => {
     const { shopId } = useParams<{ shopId: string }>();
     const navigate = useNavigate();
@@ -40,12 +50,12 @@ const ShopPage: React.FC = () => {
     const [shop, setShop] = useState<ShopData | null>(null);
     const [products, setProducts] = useState<Product[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [isShopOnline, setIsShopOnline] = useState(false);
 
     useEffect(() => {
-        const fetchShopAndProducts = async () => {
-            if (!shopId) return;
+        if (!shopId) return;
+        let cancelled = false;
 
+        const fetchShopAndProducts = async () => {
             setLoading(true);
             try {
                 // Fetch Shop Info
@@ -55,12 +65,15 @@ const ShopPage: React.FC = () => {
                     .eq('id', shopId)
                     .single();
 
+                if (cancelled) return;
+
                 if (shopError || !shopData) {
-                    console.error('Shop not found');
+                    console.error('Shop not found', shopError);
                     navigate('/'); // or show 404
                     return;
                 }
                 setShop(shopData);
+                setSearchQuery('');
 
                 // Fetch Products for this shop
                 const { data: productsData, error: productsError } = await supabase
@@ -70,43 +83,29 @@ const ShopPage: React.FC = () => {
                     .eq('is_active', true)
                     .order('created_at', { ascending: false });
 
-                if (!productsError && productsData) {
-                    setProducts(productsData);
+                if (cancelled) return;
+
+                if (productsError) {
+                    console.error('Failed to load shop products:', productsError);
+                    setProducts([]);
+                } else {
+                    setProducts(productsData ?? []);
                 }
-            } catch (err) {
-                console.error('Failed to load shop:', err);
+            } catch (err: unknown) {
+                if (!cancelled) console.error('Failed to load shop:', err);
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
         };
 
         fetchShopAndProducts();
-    }, [shopId, navigate]);
-
-    useEffect(() => {
-        if (!shop?.owner_id) return;
-        const ownerId = shop.owner_id;
-
-        const channel = supabase.channel('global_presence');
-        
-        channel.on('presence', { event: 'sync' }, () => {
-            const newState = channel.presenceState();
-            let online = false;
-            for (const [, presences] of Object.entries(newState)) {
-                for (const p of presences as any[]) {
-                    if (p.user_id === ownerId) {
-                        online = true;
-                        break;
-                    }
-                }
-            }
-            setIsShopOnline(online);
-        }).subscribe();
 
         return () => {
-            supabase.removeChannel(channel);
+            cancelled = true;
         };
-    }, [shop?.owner_id]);
+    }, [shopId, navigate]);
+
+    const isShopOnline = useIsOnline(shop?.owner_id);
 
     if (loading) {
         return (
@@ -215,9 +214,26 @@ const ShopPage: React.FC = () => {
                                     )}
                                 </div>
 
-                                <button className="self-start sm:self-auto bg-pink-600 hover:bg-pink-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-sm transition-colors text-sm hover:shadow-md cursor-pointer flex items-center gap-2">
-                                    <MessageCircle size={18} /> Message Shop
-                                </button>
+                                {shop.business_phone ? (
+                                    <a
+                                        href={`tel:${shop.business_phone.replace(/[^\d+]/g, '')}`}
+                                        title={`Call ${shop.name} at ${shop.business_phone}`}
+                                        className="self-start sm:self-auto bg-pink-600 hover:bg-pink-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-sm transition-colors text-sm hover:shadow-md cursor-pointer flex items-center gap-2"
+                                    >
+                                        <MessageCircle size={18} /> Contact Shop
+                                        <span className="font-medium opacity-90">{shop.business_phone}</span>
+                                    </a>
+                                ) : (
+                                    <span title="This shop hasn't added contact details yet" className="self-start sm:self-auto">
+                                        <button
+                                            type="button"
+                                            disabled
+                                            className="bg-gray-200 text-gray-400 px-4 py-2.5 rounded-xl font-bold text-sm cursor-not-allowed flex items-center gap-2 pointer-events-none"
+                                        >
+                                            <MessageCircle size={18} /> Contact Shop
+                                        </button>
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -318,7 +334,7 @@ const CustomerProductCard = ({ product }: { product: Product }) => {
                 <div className="mt-auto pt-3 border-t border-gray-50 flex items-center justify-between">
                     <span className="text-pink-600 font-medium text-base md:text-lg">
                         {hasVariants && <span className="text-gray-400 font-medium text-xs mr-1">from</span>}
-                        ₱{Number(product.price).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                        {formatPeso(lowestPrice(product))}
                     </span>
 
                     {product.review_count !== undefined && product.review_count > 0 && (

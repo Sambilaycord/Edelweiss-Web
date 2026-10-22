@@ -6,8 +6,9 @@ export const VALIDATION_RULES = {
   },
   password: {
     minLength: 8,
-    maxLength: 254, 
-    regex: /^[a-zA-Z0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]+$/,
+    maxLength: 72,
+    // Any printable ASCII character except space (letters, digits and all symbols, incl. ~ and `)
+    regex: /^[\x21-\x7E]+$/,
     errorMessage: "Password must be 8-72 characters and contain no spaces.",
   },
   username: {
@@ -35,7 +36,7 @@ export const VALIDATION_RULES = {
 };
 
 export const sanitizeInput = (val: string): string => {
-  return val.replace(/[<>\"\'\\]/g, ''); 
+  return val.replace(/[<>"'\\]/g, ''); 
 };
 
 export const validateField = (type: keyof typeof VALIDATION_RULES, value: string): string | null => {

@@ -1,25 +1,32 @@
 // src/components/auth/LoginForm.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 
+export interface LoginFormData {
+  email: string;
+  password: string;
+}
+
 interface LoginFormProps {
-  onSubmit: (formData: any) => void;
+  onSubmit: (formData: LoginFormData) => void;
   onSwitchToSignup: () => void;
   onForgotPassword: (email: string) => void;
   error?: string;
+  notice?: string;
   loading?: boolean;
 }
 
-const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, onForgotPassword, error, loading }) => {
+const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, onForgotPassword, error, notice, loading }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  useEffect(() => {
-    if (error) {
-      setPassword(''); 
-    }
-  }, [error]);
+  // Clear the password whenever a new error comes in (adjusting state during render instead of in an effect)
+  const [prevError, setPrevError] = useState(error);
+  if (error !== prevError) {
+    setPrevError(error);
+    if (error) setPassword('');
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +42,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, onFor
         {error && (
           <div className="mb-4 p-2 text-sm text-red-600 bg-red-100 rounded border border-red-200">
             {error}
+          </div>
+        )}
+        {notice && !error && (
+          <div role="status" className="mb-4 p-2 text-sm text-green-700 bg-green-100 rounded border border-green-200">
+            {notice}
           </div>
         )}
 
@@ -59,7 +71,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, onSwitchToSignup, onFor
               type={showPassword ? "text" : "password"}
               id="login-password"
               value={password}
-              maxLength={64}
+              maxLength={72}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 pr-10"
               placeholder="Enter your password"

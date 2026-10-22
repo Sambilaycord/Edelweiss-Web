@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 import { supabase } from '../../lib/supabaseClient';
 
-import LoginForm from './LoginForm'; 
-import SignupForm from './SignupForm';
+import LoginForm, { type LoginFormData } from './LoginForm';
+import SignupForm, { type SignupFormData } from './SignupForm';
 import { validateField, sanitizeInput } from '../../utils/characterValidation';
 import '../../styles/index.css';
 
@@ -15,8 +15,17 @@ import mail_receive from '../../assets/mail_receive.png';
 import bg from '../../assets/pink_bg.jpg'; 
 import { ArrowLeft } from 'lucide-react';
 
+interface RedirectState {
+  from?: { pathname: string; search?: string; hash?: string };
+  message?: string;
+}
+
+// Absolute URL for auth email links; respects the deploy base path (e.g. /Edelweiss-Web/)
+const authRedirectUrl = (route: string) => `${window.location.origin}${import.meta.env.BASE_URL}${route}`;
+
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isSignup, setIsSignup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -30,34 +39,53 @@ const LoginPage: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [tempEmail, setTempEmail] = useState(''); 
 
+  // One-time notice passed via navigation state (e.g. from PasswordReset)
+  const [notice, setNotice] = useState(() => (location.state as RedirectState | null)?.message ?? '');
+
+  // Drop the notice from history so it doesn't reappear on refresh, keeping any `from` redirect target
+  React.useEffect(() => {
+    const state = location.state as RedirectState | null;
+    if (!state?.message) return;
+    navigate(
+      { pathname: location.pathname, search: location.search, hash: location.hash },
+      { replace: true, state: state.from ? { from: state.from } : null },
+    );
+  }, [location, navigate]);
+
   // Handle standard Login
-  const handleLogin = async (formData: any) => {
+  const handleLogin = async (formData: LoginFormData) => {
     setError('');
+    setNotice('');
     setLoading(true);
 
-    const cleanEmail = sanitizeInput(formData.email);
+    const cleanEmail = sanitizeInput(formData.email.trim());
     const error = validateField('email', cleanEmail);
 
     if (error) {
       setError(error);
+      setLoading(false);
       return;
     }
 
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({
-        email: formData.email,
+        email: cleanEmail,
         password: formData.password,
       });
       if (authError) throw authError;
-      navigate('/');
-    } catch (err: any) {
-      if (err.message.includes('Email not confirmed')) {
-        setTempEmail(formData.email);
+      // Return to the page ProtectedRoute redirected from, if any
+      const from = (location.state as RedirectState | null)?.from;
+      navigate(from ? `${from.pathname}${from.search ?? ''}${from.hash ?? ''}` : '/', { replace: true });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '';
+      if (message.includes('Email not confirmed')) {
+        setTempEmail(cleanEmail);
         setModalTitle('Verification Required'); 
+        setResendMessage('');
         setSuccess('Verify your email before logging in.');
         return;
       }
-      setError(err.message || 'Login failed');
+      setError(message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -72,12 +100,12 @@ const LoginPage: React.FC = () => {
   }, [timeLeft]);
 
   // Handle Signup
-  const handleSignup = async (formData: any) => {
+  const handleSignup = async (formData: SignupFormData) => {
     setError('');
     setLoading(true);
-    
-    const cleanEmail = sanitizeInput(formData.email);
-    const cleanUsername = sanitizeInput(formData.username);
+
+    const cleanEmail = sanitizeInput(formData.email.trim());
+    const cleanUsername = sanitizeInput(formData.username.trim());
 
     const emailError = validateField('email', cleanEmail);
     const userError = validateField('username', cleanUsername);
@@ -89,22 +117,27 @@ const LoginPage: React.FC = () => {
       return;
     }
 
-    setTempEmail(formData.email);
+    setTempEmail(cleanEmail);
 
     try {
       const { error: signUpError } = await supabase.auth.signUp({
-        email: formData.email,
+        email: cleanEmail,
         password: formData.password,
-        options: { data: { username: formData.username } }
+        options: {
+          data: { username: cleanUsername },
+          emailRedirectTo: authRedirectUrl('login'),
+        }
       });
       if (signUpError) throw signUpError;
-      setModalTitle('Success!'); 
+      setModalTitle('Success!');
+      setResendMessage('');
       setSuccess('Check your email for a confirmation link.');
-    } catch (err: any) {
-      if (err.message.includes('already registered')) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '';
+      if (message.includes('already registered')) {
          setError('This account is already in use. Please log in instead.');
       } else {
-        setError(err.message || 'Signup failed');
+        setError(message || 'Signup failed');
       }
     } finally {
       setLoading(false);
@@ -117,13 +150,15 @@ const LoginPage: React.FC = () => {
     setResendLoading(true);
     setTimeLeft(60);
     try {
-      const { error } = await supabase.auth.resend({ 
-        email: tempEmail, 
-        type: 'signup' 
+      const { error } = await supabase.auth.resend({
+        email: tempEmail,
+        type: 'signup',
+        options: { emailRedirectTo: authRedirectUrl('login') },
       });
       if (error) throw error;
       setResendMessage('Verification email resent. Check your inbox.');
-    } catch (err: any) {
+    } catch (err: unknown) {
+      console.error('Resend verification failed:', err);
       setResendMessage('Please wait before trying again.');
     } finally {
       setResendLoading(false);
@@ -132,6 +167,7 @@ const LoginPage: React.FC = () => {
 
   const handleCloseModal = () => {
     setSuccess('');
+    setResendMessage('');
     setIsSignup(false);
     setError('');
     setFormKey(prev => prev + 1); // Incrementing the key forces the forms to reset
@@ -143,6 +179,7 @@ const LoginPage: React.FC = () => {
 
   const toggleToSignup = () => {
     setError(''); 
+    setNotice('');
     setIsSignup(true);
   };
 
@@ -258,6 +295,7 @@ const LoginPage: React.FC = () => {
              onSwitchToSignup={toggleToSignup}
              onForgotPassword={handlePasswordReset} 
              error={!isSignup ? error : ''}
+             notice={!isSignup ? notice : ''}
              loading={loading}
            />
         </div>

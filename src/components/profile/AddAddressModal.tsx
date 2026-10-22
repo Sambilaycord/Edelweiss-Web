@@ -1,12 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { X, Loader2, ChevronDown } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 
+export interface SavedAddress {
+  id: string;
+  receiver_name: string;
+  phone_number: string;
+  region: string;
+  province: string;
+  city_municipality: string;
+  barangay: string;
+  postal_code: string;
+  detailed_address: string;
+  label: string | null;
+  is_default: boolean;
+}
+
+export interface AddressProfile {
+  first_name?: string | null;
+  last_name?: string | null;
+  phone_number?: string | null;
+}
+
 interface AddAddressModalProps {
-  profile: any;
-  addressToEdit?: any; // Added this prop to support editing
+  profile: AddressProfile | null;
+  addressToEdit?: SavedAddress | null; // Added this prop to support editing
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -14,7 +34,8 @@ interface AddAddressModalProps {
 const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, addressToEdit, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   
-  // 1. Initialize state: prioritize addressToEdit, then profile defaults
+  // Initialize state: prioritize addressToEdit, then profile defaults.
+  // The parent remounts this modal (via `key`) whenever the address being edited changes.
   const [formData, setFormData] = useState({
     receiver_name: addressToEdit?.receiver_name || 
       (profile?.first_name || profile?.last_name 
@@ -31,24 +52,6 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, addressToEdi
     is_default: addressToEdit?.is_default || false
   });
 
-  // 2. Sync state if addressToEdit changes while modal is open
-  useEffect(() => {
-    if (addressToEdit) {
-      setFormData({
-        receiver_name: addressToEdit.receiver_name,
-        phone_number: addressToEdit.phone_number,
-        region: addressToEdit.region,
-        province: addressToEdit.province,
-        city: addressToEdit.city_municipality,
-        barangay: addressToEdit.barangay,
-        postal_code: addressToEdit.postal_code,
-        detailed_address: addressToEdit.detailed_address,
-        label: addressToEdit.label,
-        is_default: addressToEdit.is_default
-      });
-    }
-  }, [addressToEdit]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.postal_code) {
@@ -56,17 +59,16 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, addressToEdi
       return;
     }
 
+    if (loading) return;
     setLoading(true);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      if (formData.is_default) {
-        await supabase.from('addresses').update({ is_default: false }).eq('user_id', user.id);
-      }
-      
-      // 3. Precautionary check for max 5 addresses (only if creating NEW)
+      // Precautionary check for max 5 addresses (only if creating NEW).
+      // Also tells us whether this is the user's first address.
+      let isFirstAddress = false;
       if (!addressToEdit?.id) {
         const { count, error: countError } = await supabase
           .from('addresses')
@@ -77,9 +79,13 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, addressToEdi
         if (count !== null && count >= 5) {
           throw new Error("Maximum of 5 addresses reached.");
         }
+        isFirstAddress = count === 0;
       }
 
-      // 3. Prepare payload for UPSERT
+      // The first address always becomes the default
+      const makeDefault = formData.is_default || isFirstAddress;
+
+      // Prepare payload for UPSERT
       const payload = {
         user_id: user.id,
         receiver_name: formData.receiver_name,
@@ -90,20 +96,33 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, addressToEdi
         barangay: formData.barangay,
         postal_code: formData.postal_code,
         detailed_address: formData.detailed_address,
-        is_default: formData.is_default,
+        is_default: makeDefault,
         label: formData.label,
         ...(addressToEdit?.id && { id: addressToEdit.id })
       };
 
-      const { error } = await supabase
+      const { data: saved, error } = await supabase
         .from('addresses')
-        .upsert(payload); 
+        .upsert(payload)
+        .select('id')
+        .single();
 
       if (error) throw error;
+
+      // Only clear the other defaults once the new default has been saved successfully
+      if (makeDefault && saved?.id) {
+        const { error: clearError } = await supabase
+          .from('addresses')
+          .update({ is_default: false })
+          .eq('user_id', user.id)
+          .neq('id', saved.id);
+        if (clearError) throw clearError;
+      }
+
       onSuccess();
       onClose();
-    } catch (err: any) {
-      alert(err.message || "An error occurred");
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
@@ -114,7 +133,7 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, addressToEdi
       <div className="bg-white w-full max-w-2xl rounded-[24px] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-800 tracking-widest">New Address</h2>
+          <h2 className="text-2xl font-bold text-gray-800 tracking-widest">{addressToEdit?.id ? 'Edit Address' : 'New Address'}</h2>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer">
             <X size={20} className="text-gray-400" />
           </button>
@@ -237,7 +256,7 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({ profile, addressToEdi
             type="submit" disabled={loading}
             className="w-full bg-pink-600 text-white py-4 rounded-2xl font-bold hover:bg-pink-700 transition-all shadow-xl shadow-pink-100 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
           >
-            {loading ? <Loader2 className="animate-spin" size={20} /> : "Save Address"}
+            {loading ? <Loader2 className="animate-spin" size={20} /> : (addressToEdit?.id ? "Save Changes" : "Save Address")}
           </button>
         </form>
       </div>

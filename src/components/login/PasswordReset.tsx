@@ -4,6 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabaseClient';
 import { ArrowLeft, KeyRound, Mail, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import bg from '../../assets/pink_bg.jpg';
+import { validateField } from '../../utils/characterValidation';
+
+const getErrorMessage = (err: unknown, fallback: string) =>
+  err instanceof Error && err.message ? err.message : fallback;
 
 const PasswordReset: React.FC = () => {
   const navigate = useNavigate();
@@ -27,18 +31,36 @@ const PasswordReset: React.FC = () => {
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (step !== 'email' && step !== 'done') {
+        // Only form progress is lost — no session exists until the final submit.
         e.preventDefault();
         e.returnValue = '';
-        navigator.sendBeacon(
-          `${import.meta.env.VITE_SUPABASE_URL}/auth/v1/logout`,
-          new Blob([JSON.stringify({})], { type: 'application/json' })
-        );
-        sessionStorage.removeItem('pendingPasswordReset');
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [step]);
+
+  // Redirect to login shortly after a successful reset (timer is cleared on unmount)
+  useEffect(() => {
+    if (step !== 'done') return;
+    const timerId = setTimeout(() => {
+      navigate('/login', { state: { message: 'Password reset successful!' } });
+    }, 500);
+    return () => clearTimeout(timerId);
+  }, [step, navigate]);
+
+  // Step back one screen (reset -> code -> email)
+  const goBack = () => {
+    setError('');
+    setNewPassword('');
+    setConfirmPassword('');
+    if (step === 'reset') {
+      setStep('code');
+    } else {
+      setCode('');
+      setStep('email');
+    }
+  };
 
   // 1. Send Recovery Code
   const handleSendCode = async (e: React.FormEvent) => {
@@ -46,57 +68,75 @@ const PasswordReset: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
-      if (error) throw error;
-      setStep('code');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 2. Verify OTP
-  const handleVerifyCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        email,
-        token: code,
-        type: 'recovery',
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}password-reset`,
       });
       if (error) throw error;
-      sessionStorage.setItem('pendingPasswordReset', 'true');
-      setStep('reset');
-    } catch (err: any) {
-      setError(err.message);
+      setCode('');
+      setStep('code');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to send recovery code.'));
     } finally {
       setLoading(false);
     }
   };
 
-  // 3. Update Password
+  // 2. Collect the code. It is only verified together with the new password in step 3, because
+  // verifying a recovery code signs the user in — doing it here would leave them logged in
+  // without ever having reset their password.
+  const handleVerifyCode = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code.length !== 8) {
+      setError('Please enter the full 8-character code.');
+      return;
+    }
+    setError('');
+    setStep('reset');
+  };
+
+  // 3. Verify the code, set the new password and sign straight back out, in one go
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    const passwordError = validateField('password', newPassword);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
     if (newPassword !== confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
     setLoading(true);
     setError('');
+
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: code,
+      type: 'recovery',
+    });
+    if (verifyError) {
+      setLoading(false);
+      setCode('');
+      setStep('code');
+      setError(getErrorMessage(verifyError, 'Invalid or expired code.'));
+      return;
+    }
+
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw error;
-      sessionStorage.removeItem('pendingPasswordReset');
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateError) throw updateError;
+      // Global sign-out also ends any other sessions someone may have had on the account
       await supabase.auth.signOut();
       setStep('done');
-      setTimeout(() => {
-        navigate('/login', { state: { message: 'Password reset successful!' } });
-      }, 500);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      // The code is single-use and already spent, so the user has to request a new one.
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+      setCode('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setStep('email');
+      setError(`${getErrorMessage(err, 'Failed to update password.')} Please request a new code.`);
     } finally {
       setLoading(false);
     }
@@ -135,20 +175,13 @@ const PasswordReset: React.FC = () => {
                 </button>
                 <button
                   onClick={() => {
-                    // 1. Clear lock FIRST before anything async
-                    sessionStorage.removeItem('pendingPasswordReset');
-                    // 2. Reset form state
-                    supabase.auth.signOut();
                     setStep('email');
                     setEmail('');
                     setCode('');
                     setNewPassword('');
                     setConfirmPassword('');
                     setError('');
-                    // 3. Proceed with navigation immediately (before signOut re-renders App)
                     blocker.proceed();
-                    // 4. Sign out AFTER navigation is committed
-                    supabase.auth.signOut();
                   }}
                   className="flex-1 py-2.5 rounded-xl bg-pink-600 text-white font-semibold hover:bg-pink-700 transition-all cursor-pointer"
                 >
@@ -172,7 +205,7 @@ const PasswordReset: React.FC = () => {
             >
               {/* Back Button */}
               <button
-                onClick={() => step === 'email' ? navigate('/login') : setStep('email')}
+                onClick={() => step === 'email' ? navigate('/login') : goBack()}
                 disabled={blocker.state === 'blocked'}
                 className="absolute top-6 left-6 text-gray-400 hover:text-pink-600 transition-colors flex items-center gap-1 text-sm font-medium cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >

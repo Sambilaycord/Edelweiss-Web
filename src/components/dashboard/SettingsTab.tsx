@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import {
@@ -39,6 +39,28 @@ interface SettingsTabProps {
 
 const BUCKET = 'public-media';
 
+// Supabase errors aren't always Error instances, so read `message` structurally
+const getErrorMessage = (err: unknown, fallback: string) =>
+    err && typeof err === 'object' && 'message' in err && typeof err.message === 'string' && err.message
+        ? err.message
+        : fallback;
+
+// Extract the object path inside BUCKET from a public URL, or null if it isn't ours
+const getStoragePath = (publicUrl: string | null | undefined): string | null => {
+    if (!publicUrl) return null;
+    const marker = `/storage/v1/object/public/${BUCKET}/`;
+    const idx = publicUrl.indexOf(marker);
+    if (idx === -1) return null;
+    return decodeURIComponent(publicUrl.slice(idx + marker.length).split('?')[0]);
+};
+
+// Best-effort cleanup of storage objects; failures are logged, not surfaced
+const removeStorageFiles = async (paths: string[]) => {
+    if (paths.length === 0) return;
+    const { error } = await supabase.storage.from(BUCKET).remove(paths);
+    if (error) console.error('Failed to remove files from storage:', error);
+};
+
 const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
     const navigate = useNavigate();
 
@@ -68,10 +90,30 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
     const logoInputRef = useRef<HTMLInputElement>(null);
     const bannerInputRef = useRef<HTMLInputElement>(null);
 
-    // Show toast with auto-dismiss
+    const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Blob URLs created for local previews, revoked when replaced or on unmount
+    const objectUrlsRef = useRef<{ logo: string | null; banner: string | null }>({ logo: null, banner: null });
+
+    useEffect(() => {
+        const urls = objectUrlsRef.current;
+        return () => {
+            if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+            if (urls.logo) URL.revokeObjectURL(urls.logo);
+            if (urls.banner) URL.revokeObjectURL(urls.banner);
+        };
+    }, []);
+
+    const setObjectUrl = (type: 'logo' | 'banner', url: string | null) => {
+        const prev = objectUrlsRef.current[type];
+        if (prev) URL.revokeObjectURL(prev);
+        objectUrlsRef.current[type] = url;
+    };
+
+    // Show toast with auto-dismiss (a newer toast resets the timer instead of being cut short)
     const showToast = useCallback((type: 'success' | 'error', message: string) => {
         setToast({ type, message });
-        setTimeout(() => setToast(null), 4000);
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setToast(null), 4000);
     }, []);
 
     // Handle file selection
@@ -80,6 +122,8 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
         type: 'logo' | 'banner'
     ) => {
         const file = e.target.files?.[0];
+        // Reset so picking the same file again still fires onChange
+        e.target.value = '';
         if (!file) return;
 
         // Validate file type
@@ -95,6 +139,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
         }
 
         const previewUrl = URL.createObjectURL(file);
+        setObjectUrl(type, previewUrl);
 
         if (type === 'logo') {
             setLogoFile(file);
@@ -107,6 +152,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
 
     // Remove selected image
     const removeImage = (type: 'logo' | 'banner') => {
+        setObjectUrl(type, null);
         if (type === 'logo') {
             setLogoFile(null);
             setLogoPreview(shop.shop_logo_url || null);
@@ -119,7 +165,13 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
     };
 
     // Upload image to Supabase Storage
-    const uploadImage = async (file: File, path: string): Promise<string> => {
+    // Returns the new public URL plus the previous file's path when it differs
+    // (e.g. a different extension), so the caller can remove it once the DB points at the new one
+    const uploadImage = async (
+        file: File,
+        path: string,
+        previousUrl: string | null
+    ): Promise<{ url: string; stalePath: string | null }> => {
         const fileExt = file.name.split('.').pop();
         const filePath = `${path}.${fileExt}`;
 
@@ -133,12 +185,17 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
             .from(BUCKET)
             .getPublicUrl(filePath);
 
-        // Append timestamp to bust cache
-        return `${urlData.publicUrl}?t=${Date.now()}`;
+        const previousPath = getStoragePath(previousUrl);
+        return {
+            // Append timestamp to bust cache
+            url: `${urlData.publicUrl}?t=${Date.now()}`,
+            stalePath: previousPath && previousPath !== filePath ? previousPath : null,
+        };
     };
 
     // Save all changes
     const handleSave = async () => {
+        if (saving) return;
         if (!name.trim()) {
             showToast('error', 'Shop name is required.');
             return;
@@ -153,15 +210,20 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
 
             let logoUrl = shop.shop_logo_url;
             let bannerUrl = shop.shop_banner_url;
+            const stalePaths: string[] = [];
 
             // Upload logo if changed — path: shops/{user_id}/logo.ext
             if (logoFile) {
-                logoUrl = await uploadImage(logoFile, `shops/${user.id}/logo`);
+                const result = await uploadImage(logoFile, `shops/${user.id}/logo`, shop.shop_logo_url);
+                logoUrl = result.url;
+                if (result.stalePath) stalePaths.push(result.stalePath);
             }
 
             // Upload banner if changed — path: shops/{user_id}/banner.ext
             if (bannerFile) {
-                bannerUrl = await uploadImage(bannerFile, `shops/${user.id}/banner`);
+                const result = await uploadImage(bannerFile, `shops/${user.id}/banner`, shop.shop_banner_url);
+                bannerUrl = result.url;
+                if (result.stalePath) stalePaths.push(result.stalePath);
             }
 
             // Update shop record
@@ -182,17 +244,22 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
 
             if (error) throw error;
 
-            // Clear file selections
+            // The shop now references the new files; drop replaced ones (best-effort)
+            await removeStorageFiles(stalePaths);
+
+            // Clear file selections and swap blob previews for the saved URLs
             setLogoFile(null);
             setBannerFile(null);
+            if (logoFile) { setLogoPreview(logoUrl); setObjectUrl('logo', null); }
+            if (bannerFile) { setBannerPreview(bannerUrl); setObjectUrl('banner', null); }
 
             // Notify parent
             if (data) onShopUpdated(data);
 
             showToast('success', 'Shop settings saved successfully!');
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            showToast('error', err.message || 'Failed to save settings.');
+            showToast('error', getErrorMessage(err, 'Failed to save settings.'));
         } finally {
             setSaving(false);
         }
@@ -200,12 +267,28 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
 
     // Delete shop handler
     const handleDeleteShop = async () => {
+        if (deleting) return;
         setDeleting(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('Authentication required');
 
-            // 1. Delete the shop record
+            // 1. Collect storage paths before the rows go away (products may cascade with the shop)
+            const { data: productRows, error: productsError } = await supabase
+                .from('products')
+                .select('image_urls')
+                .eq('shop_id', shop.id);
+            if (productsError) console.error('Failed to list product images for cleanup:', productsError);
+
+            const storagePaths = [
+                shop.shop_logo_url,
+                shop.shop_banner_url,
+                ...((productRows || []) as { image_urls: string[] | null }[]).flatMap(p => p.image_urls || []),
+            ]
+                .map(getStoragePath)
+                .filter((p): p is string => !!p);
+
+            // 2. Delete the shop record. Nothing has changed yet if this fails.
             const { error: shopError } = await supabase
                 .from('shops')
                 .delete()
@@ -213,21 +296,40 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
 
             if (shopError) throw shopError;
 
-            // 2. Revert profile role back to customer
-            const { error: profileError } = await supabase
+            // 3. Revert profile role back to customer (retry once so we don't strand a seller without a shop)
+            const revertRole = () => supabase
                 .from('profiles')
                 .update({ role: 'customer' })
                 .eq('id', user.id);
 
-            if (profileError) throw profileError;
+            let { error: profileError } = await revertRole();
+            if (profileError) {
+                console.error('Role revert failed, retrying:', profileError);
+                ({ error: profileError } = await revertRole());
+            }
 
-            // 3. Navigate to profile page
+            // 4. Best-effort storage cleanup now that the DB delete succeeded
+            await removeStorageFiles(storagePaths);
+
+            if (profileError) {
+                console.error(profileError);
+                setShowDeleteModal(false);
+                setDeleteConfirmText('');
+                setDeleting(false);
+                showToast(
+                    'error',
+                    'Your shop was deleted, but your account could not be switched back to a customer account. Please refresh and try again, or contact support.'
+                );
+                return;
+            }
+
+            // 5. Navigate to profile page
             navigate('/profile', {
                 state: { message: 'Your shop has been deleted.' }
             });
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            showToast('error', err.message || 'Failed to delete shop.');
+            showToast('error', getErrorMessage(err, 'Failed to delete shop.'));
             setDeleting(false);
         }
     };
@@ -236,7 +338,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
     const hasChanges =
         name !== (shop.name || '') ||
         description !== (shop.description || '') ||
-        businessPhone !== (shop.business_phone || '') ||
+        (businessPhone || '') !== (shop.business_phone || '') ||
         shopAddress !== (shop.shop_address || '') ||
         isVacation !== (shop.is_vacation || false) ||
         logoFile !== null ||
@@ -318,6 +420,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ shop, onShopUpdated }) => {
                                 </label>
                                 <textarea
                                     rows={5}
+                                    maxLength={500}
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
                                     placeholder="Tell customers about your shop, what you sell, and what makes you unique..."

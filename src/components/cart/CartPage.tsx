@@ -1,38 +1,68 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, Store, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../common/Navbar';
 
+interface CartVariant {
+  id: string;
+  name: string;
+  price: number;
+  stock?: number | null;
+}
+
+interface CartItem {
+  id: string;
+  quantity: number;
+  product_id: string;
+  variant_id: string | null;
+  products: {
+    id: string;
+    name: string;
+    price: number;
+    stock?: number | null;
+    image_urls: string[] | null;
+    shops: { id: string; name: string } | null;
+    product_variants: CartVariant[] | null;
+  } | null;
+  product_variants: CartVariant | null;
+}
+
+interface ShopGroup {
+  name: string;
+  items: CartItem[];
+}
+
 const CartPage: React.FC = () => {
-  const [cartItems, setCartItems] = useState<any[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [updatingVariant, setUpdatingVariant] = useState(false);
   const navigate = useNavigate();
+  // Tracks whether the initial load has happened, so background refreshes keep the user's selection
+  const hasLoadedRef = useRef(false);
 
   const [promoCode, setPromoCode] = useState('');
   const [appliedDiscount, setAppliedDiscount] = useState(0);
+  const [appliedPromoCode, setAppliedPromoCode] = useState('');
   const [promoMessage, setPromoMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
 
-  useEffect(() => {
-    fetchCart();
-  }, []);
-
-  const fetchCart = async (showLoader = true) => {
-    if (showLoader) setLoading(true);
+  const fetchCart = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
+      let items: CartItem[] = [];
       if (user) {
-        const { data: cartData } = await supabase
+        const { data: cartData, error: cartError } = await supabase
           .from('carts')
           .select('id')
           .eq('customer_id', user.id)
           .maybeSingle();
+        if (cartError) throw cartError;
 
         if (cartData) {
-          const { data: items } = await supabase
+          const { data, error: itemsError } = await supabase
             .from('cart_items')
             .select(`
                 id, 
@@ -43,6 +73,7 @@ const CartPage: React.FC = () => {
                     id, 
                     name, 
                     price, 
+                    stock,
                     image_urls,
                     shops (id, name),
                     product_variants (id, name, price, stock)
@@ -50,29 +81,38 @@ const CartPage: React.FC = () => {
                 product_variants (
                     id,
                     name,
-                    price
+                    price,
+                    stock
                 )
             `)
             .eq('cart_id', cartData.id);
-
-          setCartItems(items || []);
-          setSelectedItems((items || []).map(item => item.id));
-        } else {
-          setCartItems([]);
-          setSelectedItems([]);
+          if (itemsError) throw itemsError;
+          items = (data as unknown as CartItem[] | null) || [];
         }
-      } else {
-        setCartItems([]);
-        setSelectedItems([]);
       }
+
+      setCartItems(items);
+      const ids = items.map(item => item.id);
+      if (!hasLoadedRef.current) {
+        // First load: select everything
+        setSelectedItems(ids);
+      } else {
+        // Background refresh: keep the user's selection, dropping items that no longer exist
+        setSelectedItems(prev => prev.filter(id => ids.includes(id)));
+      }
+      hasLoadedRef.current = true;
     } catch (err) {
       console.error("Error fetching cart:", err);
     } finally {
-      if (showLoader) setLoading(false);
+      setLoading(false);
     }
-  };
+  }, []);
 
-  const groupedItems = cartItems.reduce((acc: any, item) => {
+  useEffect(() => {
+    fetchCart();
+  }, [fetchCart]);
+
+  const groupedItems = cartItems.reduce((acc: Record<string, ShopGroup>, item) => {
     const shopId = item.products?.shops?.id || "unknown";
     const shopName = item.products?.shops?.name || "Unknown Shop";
     if (!acc[shopId]) acc[shopId] = { name: shopName, items: [] };
@@ -95,8 +135,8 @@ const CartPage: React.FC = () => {
   };
 
   const toggleShopSelection = (shopId: string) => {
-    const shopItemIds = groupedItems[shopId].items.map((i: any) => i.id);
-    const allShopSelected = shopItemIds.every((id: string) => selectedItems.includes(id));
+    const shopItemIds = groupedItems[shopId].items.map(i => i.id);
+    const allShopSelected = shopItemIds.every(id => selectedItems.includes(id));
 
     if (allShopSelected) {
       setSelectedItems(prev => prev.filter(id => !shopItemIds.includes(id)));
@@ -105,70 +145,129 @@ const CartPage: React.FC = () => {
     }
   };
 
-  const updateQuantity = async (id: string, newQty: number) => {
-    if (newQty < 1) return;
+  // Latest quantity the user asked for per item, and which items currently have a write in flight.
+  // Writes are serialized per item so rapid +/- clicks can't land in the DB out of order.
+  const pendingQtyRef = useRef<Record<string, number>>({});
+  const syncingRef = useRef<Set<string>>(new Set());
+
+  const syncQuantity = async (id: string) => {
+    if (syncingRef.current.has(id)) return;
+    syncingRef.current.add(id);
+    try {
+      while (pendingQtyRef.current[id] !== undefined) {
+        const qty = pendingQtyRef.current[id];
+        const { error } = await supabase.from('cart_items').update({ quantity: qty }).eq('id', id);
+        if (error) {
+          console.error(error);
+          delete pendingQtyRef.current[id];
+          fetchCart(); // Revert on sync failure
+          break;
+        }
+        if (pendingQtyRef.current[id] === qty) delete pendingQtyRef.current[id];
+      }
+    } finally {
+      syncingRef.current.delete(id);
+    }
+  };
+
+  // Untracked (null) or zero stock doesn't cap the stepper; place_order enforces stock at checkout
+  const stockCap = (stock: number | null | undefined) =>
+    typeof stock === 'number' && stock > 0 ? stock : Infinity;
+
+  const getMaxQuantity = (item: CartItem) =>
+    stockCap(item.variant_id ? item.product_variants?.stock : item.products?.stock);
+
+  const updateQuantity = (item: CartItem, newQty: number) => {
+    if (newQty < 1 || newQty > getMaxQuantity(item)) return;
 
     // Optimistic UI Update
-    setCartItems(prev => prev.map(item => item.id === id ? { ...item, quantity: newQty } : item));
+    setCartItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: newQty } : i));
 
     // Background sync
-    const { error } = await supabase.from('cart_items').update({ quantity: newQty }).eq('id', id);
-    if (error) {
-      console.error(error);
-      fetchCart(false); // Revert on sync failure
-    }
+    pendingQtyRef.current[item.id] = newQty;
+    syncQuantity(item.id);
   };
 
   const removeItem = async (id: string) => {
     // Optimistic UI Update
     setCartItems(prev => prev.filter(item => item.id !== id));
     setSelectedItems(prev => prev.filter(itemId => itemId !== id));
+    delete pendingQtyRef.current[id];
 
     // Background sync
     const { error } = await supabase.from('cart_items').delete().eq('id', id);
     if (error) {
       console.error(error);
-      fetchCart(false); // Revert on sync failure
+      fetchCart(); // Revert on sync failure
     }
   };
 
   const handleUpdateVariant = async (itemId: string, newVariantId: string) => {
+    if (updatingVariant) return;
     const item = cartItems.find(i => i.id === itemId);
     if (!item) return;
-
-    // Check if another item with the same product and NEW variant already exists
-    const existingMatch = cartItems.find(i =>
-      i.product_id === item.product_id &&
-      i.variant_id === newVariantId &&
-      i.id !== itemId
-    );
-
-    if (existingMatch) {
-      // Merge: Update existing item quantity and delete current item
-      const { error: updateError } = await supabase
-        .from('cart_items')
-        .update({ quantity: existingMatch.quantity + item.quantity })
-        .eq('id', existingMatch.id);
-
-      if (!updateError) {
-        await supabase.from('cart_items').delete().eq('id', itemId);
-      }
-    } else {
-      // Simple update
-      await supabase.from('cart_items').update({ variant_id: newVariantId }).eq('id', itemId);
+    if (item.variant_id === newVariantId) {
+      setEditingItemId(null);
+      return;
     }
 
-    setEditingItemId(null);
-    fetchCart(false);
+    setUpdatingVariant(true);
+    try {
+      // Check if another item with the same product and NEW variant already exists
+      const existingMatch = cartItems.find(i =>
+        i.product_id === item.product_id &&
+        i.variant_id === newVariantId &&
+        i.id !== itemId
+      );
+
+      const newVariant = item.products?.product_variants?.find(v => v.id === newVariantId);
+      const maxForNewVariant = stockCap(newVariant?.stock);
+
+      if (existingMatch) {
+        // Merge: Update existing item quantity (never beyond the variant's stock) and delete current item
+        const mergedQty = Math.max(1, Math.min(existingMatch.quantity + item.quantity, maxForNewVariant));
+        const { error: updateError } = await supabase
+          .from('cart_items')
+          .update({ quantity: mergedQty })
+          .eq('id', existingMatch.id);
+        if (updateError) throw updateError;
+
+        const { error: deleteError } = await supabase.from('cart_items').delete().eq('id', itemId);
+        if (deleteError) throw deleteError;
+
+        // Carry the selection over to the merged row
+        setSelectedItems(prev =>
+          prev.includes(itemId)
+            ? [...new Set([...prev.filter(id => id !== itemId), existingMatch.id])]
+            : prev
+        );
+      } else {
+        // Simple update (clamp the quantity to the new variant's stock)
+        const { error } = await supabase
+          .from('cart_items')
+          .update({ variant_id: newVariantId, quantity: Math.max(1, Math.min(item.quantity, maxForNewVariant)) })
+          .eq('id', itemId);
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error('Error updating variant:', err);
+    } finally {
+      setEditingItemId(null);
+      setUpdatingVariant(false);
+      fetchCart();
+    }
   };
 
   const handleApplyPromo = () => {
     // Mock validation logic
-    if (promoCode.toUpperCase() === 'EDELWEISS2026') {
+    const code = promoCode.trim().toUpperCase();
+    if (code === 'EDELWEISS2026') {
       setAppliedDiscount(100); // Flat ₱100 off
+      setAppliedPromoCode(code);
       setPromoMessage({ text: 'Promo code applied!', type: 'success' });
     } else {
       setAppliedDiscount(0);
+      setAppliedPromoCode('');
       setPromoMessage({ text: 'Invalid promo code', type: 'error' });
     }
   };
@@ -219,14 +318,14 @@ const CartPage: React.FC = () => {
               </div>
 
               {/* Grouped Shop Containers */}
-              {Object.entries(groupedItems).map(([shopId, shopData]: [string, any]) => (
+              {Object.entries(groupedItems).map(([shopId, shopData]) => (
                 <div key={shopId} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
 
                   {/* Shop Header Section */}
                   <div className=" px-5 py-4 border-b border-gray-100 flex items-center gap-3">
                     <input
                       type="checkbox"
-                      checked={shopData.items.every((item: any) => selectedItems.includes(item.id))}
+                      checked={shopData.items.every(item => selectedItems.includes(item.id))}
                       onChange={() => toggleShopSelection(shopId)}
                       className="w-5 h-5 accent-pink-600 rounded cursor-pointer"
                     />
@@ -242,7 +341,7 @@ const CartPage: React.FC = () => {
 
                   {/* Product List with Internal Dividers */}
                   <div className="divide-y divide-gray-50">
-                    {shopData.items.map((item: any) => (
+                    {shopData.items.map(item => (
                       <div key={item.id} className="p-5 flex gap-5 items-center transition-colors hover:bg-gray-50/30">
                         <input
                           type="checkbox"
@@ -272,10 +371,11 @@ const CartPage: React.FC = () => {
                             <div className="mb-2 mt-2">
                               <label className="text-[10px] font-medium text-gray-400 uppercase tracking-widest block mb-1">Select Variant</label>
                               <div className="flex flex-wrap gap-2">
-                                {item.products?.product_variants?.map((v: any) => (
+                                {item.products?.product_variants?.map(v => (
                                   <button
                                     key={v.id}
                                     onClick={() => handleUpdateVariant(item.id, v.id)}
+                                    disabled={updatingVariant}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${item.variant_id === v.id
                                       ? 'bg-pink-600 text-white border-pink-600'
                                       : 'bg-white text-gray-600 border-gray-200 hover:border-pink-300'
@@ -296,8 +396,8 @@ const CartPage: React.FC = () => {
                             <div className="flex items-center gap-1 mb-1">
                               <p className="text-sm text-gray-500">Variant: </p>
                               <button
-                                onClick={() => item.products?.product_variants?.length > 0 && setEditingItemId(item.id)}
-                                className={`text-sm text-pink-600 font-medium ${item.products?.product_variants?.length > 0 ? 'underline hover:text-pink-700 cursor-pointer' : 'no-underline cursor-default'}`}
+                                onClick={() => (item.products?.product_variants?.length ?? 0) > 0 && setEditingItemId(item.id)}
+                                className={`text-sm text-pink-600 font-medium ${(item.products?.product_variants?.length ?? 0) > 0 ? 'underline hover:text-pink-700 cursor-pointer' : 'no-underline cursor-default'}`}
                               >
                                 {item.product_variants?.name || "Default"}
                               </button>
@@ -307,9 +407,9 @@ const CartPage: React.FC = () => {
 
                           <div className="flex items-center gap-4 mt-3">
                             <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
-                              <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="p-1.5 hover:bg-gray-50 cursor-pointer"><Minus size={14} /></button>
+                              <button onClick={() => updateQuantity(item, item.quantity - 1)} className="p-1.5 hover:bg-gray-50 cursor-pointer"><Minus size={14} /></button>
                               <span className="px-4 font-medium text-sm text-gray-700">{item.quantity}</span>
-                              <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="p-1.5 hover:bg-gray-50 cursor-pointer"><Plus size={14} /></button>
+                              <button onClick={() => updateQuantity(item, item.quantity + 1)} className="p-1.5 hover:bg-gray-50 cursor-pointer"><Plus size={14} /></button>
                             </div>
                             <button onClick={() => removeItem(item.id)} className="text-red-500 hover:text-red-700 transition-colors cursor-pointer p-1">
                               <Trash2 size={20} />
@@ -374,7 +474,7 @@ const CartPage: React.FC = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => navigate('/checkout', { state: { items: selectedCartData } })}
+                  onClick={() => navigate('/checkout', { state: { items: selectedCartData, discount: appliedDiscount, promoCode: appliedPromoCode } })}
                   disabled={selectedItems.length === 0}
                   className="w-full bg-pink-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-pink-700 transition-all shadow-xl shadow-pink-100 cursor-pointer disabled:opacity-50"
                 >

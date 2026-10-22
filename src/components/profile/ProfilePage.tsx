@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import type { User as AuthUser } from '@supabase/supabase-js';
 import { useNavigate, useLocation } from 'react-router-dom'; // Added useLocation here
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabaseClient';
@@ -11,6 +12,7 @@ import AddressTab from './AddressTab';
 import RemindersTab from './RemindersTab';
 import WishlistTab from './WishlistTab';
 import OrdersTab from './OrdersTab';
+import SettingsPanel from './SettingsPanel';
 import { validateField, sanitizeInput } from '../../utils/characterValidation';
 
 import { User, Package, Heart, MapPin, LogOut, Settings, Loader2, Store, Pencil, Calendar } from 'lucide-react';
@@ -27,28 +29,38 @@ interface ProfileData {
   birthdate: string | null;
 }
 
+type Role = 'customer' | 'shop_owner' | 'admin';
+
+interface ProfileLocationState {
+  activeTab?: string;
+  confetti?: boolean;
+}
+
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation(); // 1. Must be declared before being used in useState
+  const locationState = location.state as ProfileLocationState | null;
+  const confettiIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 
   // 2. Initialize using the state passed from navigate
-  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'profile');
+  const [activeTab, setActiveTab] = useState<string>(locationState?.activeTab || 'profile');
 
-  const [sessionUser, setSessionUser] = useState<any>(null);
-  const [role, setRole] = useState<'customer' | 'shop_owner' | 'admin'>('customer');
+  const [sessionUser, setSessionUser] = useState<AuthUser | null>(null);
+  const [role, setRole] = useState<Role>('customer');
 
   // 3. Effect to handle tab switching while the component is already mounted
   useEffect(() => {
-    if (location.state?.activeTab) {
-      setActiveTab(location.state.activeTab);
-      // Clean up state so it doesn't stay on that tab if the user refreshes manually
-      window.history.replaceState({}, document.title);
+    if (locationState?.activeTab) {
+      setActiveTab(locationState.activeTab);
+      // Clean up state so it doesn't stay on that tab if the user refreshes manually.
+      // Go through the router (not window.history) so its location/state stay in sync.
+      navigate(location.pathname, { replace: true, state: null });
     }
-  }, [location.state]);
+  }, [locationState, location.pathname, navigate]);
 
   // 4. Scroll to top on every tab switch
   useEffect(() => {
@@ -73,53 +85,66 @@ const ProfilePage: React.FC = () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) { navigate('/login'); return; }
-        setSessionUser(session.user);
 
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('profiles')
           .select('username, first_name, last_name, phone_number, avatar_url, gender, birthdate, role')
           .eq('id', session.user.id)
-          .single();
+          .maybeSingle();
+        if (error) throw error;
 
-        if (data) {
-          setRole(data.role as any);
-          setProfile({
-            username: data?.username || session.user.user_metadata?.username || '',
-            first_name: data?.first_name || '',
-            last_name: data?.last_name || '',
-            phone_number: data?.phone_number || '',
-            email: session.user.email || '',
-            avatar_url: data?.avatar_url || null,
-            gender: data?.gender || '',
-            birthdate: data?.birthdate || '',
-          });
-        }
+        if (data?.role) setRole(data.role as Role);
+        // Populate from the session even if the profile row doesn't exist yet
+        setProfile({
+          username: data?.username || session.user.user_metadata?.username || '',
+          first_name: data?.first_name || '',
+          last_name: data?.last_name || '',
+          phone_number: data?.phone_number || '',
+          email: session.user.email || '',
+          avatar_url: data?.avatar_url || null,
+          gender: data?.gender || '',
+          birthdate: data?.birthdate || '',
+        });
+        setSessionUser(session.user);
       } catch (err) { console.error(err); } finally { setLoading(false); }
     };
     getProfile();
   }, [navigate]);
 
   useEffect(() => {
-    if (location.state?.confetti) {
+    if (locationState?.confetti) {
       const duration = 3 * 1000;
       const animationEnd = Date.now() + duration;
       const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
       const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
 
-      const interval: any = setInterval(function () {
+      if (confettiIntervalRef.current) clearInterval(confettiIntervalRef.current);
+      const interval = setInterval(function () {
         const timeLeft = animationEnd - Date.now();
-        if (timeLeft <= 0) return clearInterval(interval);
+        if (timeLeft <= 0) {
+          clearInterval(interval);
+          confettiIntervalRef.current = null;
+          return;
+        }
         const particleCount = 50 * (timeLeft / duration);
         confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }, colors: ['#db2777', '#fbcfe8', '#fbbf24'] });
         confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }, colors: ['#db2777', '#fbcfe8', '#fbbf24'] });
       }, 250);
+      confettiIntervalRef.current = interval;
 
-      window.history.replaceState({}, document.title);
+      // Clear the flag so a refresh/back doesn't replay the confetti
+      navigate(location.pathname, { replace: true, state: null });
     }
-  }, [location]);
+  }, [locationState, location.pathname, navigate]);
+
+  // Stop any running confetti animation when leaving the page
+  useEffect(() => () => {
+    if (confettiIntervalRef.current) clearInterval(confettiIntervalRef.current);
+  }, []);
 
   const updateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (updating || !sessionUser) return;
     setUpdating(true);
     setMessage(null);
 
@@ -150,8 +175,8 @@ const ProfilePage: React.FC = () => {
       });
       if (error) throw error;
       setMessage({ text: 'Profile updated successfully!', type: 'success' });
-    } catch (err: any) {
-      setMessage({ text: err.message || 'Error updating profile', type: 'error' });
+    } catch (err: unknown) {
+      setMessage({ text: err instanceof Error && err.message ? err.message : 'Error updating profile', type: 'error' });
     } finally { setUpdating(false); }
   };
 
@@ -238,6 +263,9 @@ const ProfilePage: React.FC = () => {
               {activeTab === 'reminders' && (
                 <RemindersTab />
               )}
+              {activeTab === 'settings' && (
+                <SettingsPanel />
+              )}
               {activeTab === 'wishlist' && (
                 <WishlistTab />
               )}
@@ -245,7 +273,7 @@ const ProfilePage: React.FC = () => {
           </main>
         </div>
       </div>
-      {sessionUser && (
+      {sessionUser && showEditModal && (
         <EditProfileModal
           isOpen={showEditModal}
           onClose={() => setShowEditModal(false)}
@@ -267,7 +295,14 @@ const ProfilePage: React.FC = () => {
   );
 };
 
-const SidebarItem = ({ icon, label, isActive, onClick }: any) => (
+interface SidebarItemProps {
+  icon: React.ReactNode;
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+}
+
+const SidebarItem = ({ icon, label, isActive, onClick }: SidebarItemProps) => (
   <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium mb-1 cursor-pointer ${isActive ? 'bg-pink-50 text-pink-600' : 'text-gray-600 hover:bg-gray-50'}`}>
     {icon} {label}
   </button>

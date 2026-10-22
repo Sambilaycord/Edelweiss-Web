@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Grid, X } from 'lucide-react';
 
 import bouquetImg from '../../assets/product_categories/bouquet.jpg';
@@ -8,24 +9,28 @@ import boxesImg from '../../assets/product_categories/flower_box.jpg';
 import basketImg from '../../assets/product_categories/flower_basket.jpg';
 import driedImg from '../../assets/product_categories/dried_flowers.jpg';
 import funeralImg from '../../assets/product_categories/funeral_flowers.jpg';
-import crochetImg from '../../assets/product_categories/crochet_flowers.png';
+import crochetImg from '../../assets/product_categories/crochet_flowers.webp';
 import artificialImg from '../../assets/product_categories/artificial_flowers.jpg';
 
 
 const CategoryCircles = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Products have no category column, so each category searches product names for a keyword
+  // (singular stem so e.g. "Bouquet" and "Bouquets" both match the name ilike filter).
   const categories = [
-    { id: 1, name: "Bouquets", image: bouquetImg },
-    { id: 2, name: "Single Stems", image: stemsImg },
-    { id: 3, name: "Vase Arrangements", image: vaseImg },
-    { id: 4, name: "Flower Boxes", image: boxesImg },
-    { id: 5, name: "Baskets", image: basketImg },
-    { id: 6, name: "Dried Flowers", image: driedImg },
-    { id: 7, name: "Funeral Flowers", image: funeralImg },
-    { id: 8, name: "Crocheted Flowers", image: crochetImg },
-    { id: 9, name: "Artificial Flowers", image: artificialImg },
+    { id: 1, name: "Bouquets", query: "Bouquet", image: bouquetImg },
+    { id: 2, name: "Single Stems", query: "Stem", image: stemsImg },
+    { id: 3, name: "Vase Arrangements", query: "Vase", image: vaseImg },
+    { id: 4, name: "Flower Boxes", query: "Box", image: boxesImg },
+    { id: 5, name: "Baskets", query: "Basket", image: basketImg },
+    { id: 6, name: "Dried Flowers", query: "Dried", image: driedImg },
+    { id: 7, name: "Funeral Flowers", query: "Funeral", image: funeralImg },
+    { id: 8, name: "Crocheted Flowers", query: "Crochet", image: crochetImg },
+    { id: 9, name: "Artificial Flowers", query: "Artificial", image: artificialImg },
   ];
+
+  const categoryLink = (query: string) => `/search?${new URLSearchParams({ q: query })}`;
 
   return (
     <section className="relative py-4 mt-8 mx-auto">
@@ -34,9 +39,9 @@ const CategoryCircles = () => {
       </h2>
       <div className="flex items-start justify-center gap-4 md:gap-8 overflow-x-auto scrollbar-hide p-2">
         {categories.map((cat) => (
-          <a
+          <Link
             key={cat.id}
-            href="#"
+            to={categoryLink(cat.query)}
             className="group flex flex-col items-center flex-shrink-0 w-[calc((100%-64px)/5)] sm:w-[calc((100%-80px)/6)] md:w-[calc((100%-288px)/10)] gap-4 transition-transform duration-300 hover:scale-105"
           >
             <div className="aspect-square w-full rounded-full overflow-hidden bg-gray-50 border border-gray-100 group-hover:border-pink-300 transition-all duration-500 shadow-sm group-hover:shadow-lg group-hover:shadow-pink-100/50">
@@ -49,7 +54,7 @@ const CategoryCircles = () => {
             <span className="text-[10px] sm:text-xs md:text-sm font-medium text-gray-700 text-center leading-tight group-hover:text-pink-600 transition-colors line-clamp-2">
               {cat.name}
             </span>
-          </a>
+          </Link>
         ))}
         <button
           onClick={() => setIsModalOpen(true)}
@@ -88,9 +93,10 @@ const CategoryCircles = () => {
             <div className="p-6 md:p-8 overflow-y-auto custom-scrollbar bg-gray-50/30">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
                 {categories.map((cat) => (
-                  <a
+                  <Link
                     key={cat.id}
-                    href="#"
+                    to={categoryLink(cat.query)}
+                    onClick={() => setIsModalOpen(false)}
                     className="group flex flex-col items-center bg-white p-4 rounded-2xl border border-gray-100 hover:border-pink-200 hover:shadow-xl hover:shadow-pink-500/5 transition-all duration-300"
                   >
                     <div className="w-20 h-20 md:w-28 md:h-28 rounded-full overflow-hidden bg-gray-50 mb-4 border-2 border-transparent group-hover:border-pink-100 transition-all duration-500">
@@ -103,7 +109,7 @@ const CategoryCircles = () => {
                     <span className="text-sm md:text-base font-bold text-gray-800 text-center group-hover:text-pink-600 transition-colors">
                       {cat.name}
                     </span>
-                  </a>
+                  </Link>
                 ))}
               </div>
             </div>

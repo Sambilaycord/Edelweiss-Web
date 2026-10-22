@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 
+export interface SignupFormData {
+  email: string;
+  password: string;
+  username: string;
+}
+
 interface SignupFormProps {
-  onSubmit: (formData: any) => void;
+  onSubmit: (formData: SignupFormData) => void;
   onSwitchToLogin: () => void;
   error?: string;
   loading?: boolean;
@@ -75,7 +81,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, onSwitchToLogin, erro
             <input
               type={showPassword ? "text" : "password"}
               value={password}
-              maxLength={64}
+              maxLength={72}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none pr-10"
               placeholder="Password"
@@ -98,7 +104,7 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSubmit, onSwitchToLogin, erro
             <input
               type={showConfirmPassword ? "text" : "password"}
               value={confirmPassword}
-              maxLength={64}
+              maxLength={72}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none pr-10"
               placeholder="Re-enter password"

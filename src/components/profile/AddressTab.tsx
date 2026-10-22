@@ -1,49 +1,94 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { MapPin, Plus, Trash2, Edit2, Loader2 } from 'lucide-react';
 import AddAddressModal from './AddAddressModal';
+import type { AddressProfile, SavedAddress } from './AddAddressModal';
 
 interface AddressTabProps {
-  profile: any;
+  profile: AddressProfile;
 }
 
 const AddressTab: React.FC<AddressTabProps> = ({ profile }) => {
-  const [addresses, setAddresses] = useState<any[]>([]);
+  const [addresses, setAddresses] = useState<SavedAddress[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [editingAddress, setEditingAddress] = useState<any | null>(null);
+  const [editingAddress, setEditingAddress] = useState<SavedAddress | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const fetchAddresses = async () => {
-    setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase
-        .from('addresses')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('is_default', { ascending: false });
-      setAddresses(data || []);
+  const fetchAddresses = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data, error } = await supabase
+          .from('addresses')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('is_default', { ascending: false });
+        if (error) throw error;
+        setAddresses((data as SavedAddress[] | null) || []);
+      }
+    } catch (err) {
+      console.error('Error fetching addresses:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     fetchAddresses();
-  }, []);
+  }, [fetchAddresses]);
 
   const deleteAddress = async (id: string) => {
-    const { error } = await supabase.from('addresses').delete().eq('id', id);
-    if (!error) fetchAddresses();
+    if (busyId) return;
+    setBusyId(id);
+    try {
+      const deleted = addresses.find(a => a.id === id);
+      const { error } = await supabase.from('addresses').delete().eq('id', id);
+      if (error) throw error;
+
+      // If the default address was deleted, promote another one so the user still has a default
+      const remaining = addresses.filter(a => a.id !== id);
+      if (deleted?.is_default && remaining.length > 0) {
+        const { error: defaultError } = await supabase
+          .from('addresses')
+          .update({ is_default: true })
+          .eq('id', remaining[0].id);
+        if (defaultError) throw defaultError;
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to delete address');
+    } finally {
+      setBusyId(null);
+      fetchAddresses();
+    }
   };
 
   const setDefault = async (id: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('addresses').update({ is_default: false }).eq('user_id', user?.id);
-    await supabase.from('addresses').update({ is_default: true }).eq('id', id);
-    fetchAddresses();
+    if (busyId) return;
+    setBusyId(id);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Authentication required');
+
+      // Set the new default first so a failure never leaves the user without one
+      const { error: setError } = await supabase.from('addresses').update({ is_default: true }).eq('id', id);
+      if (setError) throw setError;
+
+      const { error: clearError } = await supabase
+        .from('addresses')
+        .update({ is_default: false })
+        .eq('user_id', user.id)
+        .neq('id', id);
+      if (clearError) throw clearError;
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to set default address');
+    } finally {
+      setBusyId(null);
+      fetchAddresses();
+    }
   };
 
-  const handleEdit = (addr: any) => {
+  const handleEdit = (addr: SavedAddress) => {
     setEditingAddress(addr);
     setShowModal(true);
   };
@@ -122,6 +167,7 @@ const AddressTab: React.FC<AddressTabProps> = ({ profile }) => {
                     </button>
                     <button
                       onClick={() => deleteAddress(addr.id)}
+                      disabled={busyId !== null}
                       className="text-gray-400 hover:text-red-500 transition-colors cursor-pointer p-1"
                       title="Delete Address"
                     >
@@ -131,6 +177,7 @@ const AddressTab: React.FC<AddressTabProps> = ({ profile }) => {
                   {!addr.is_default && (
                     <button
                       onClick={() => setDefault(addr.id)}
+                      disabled={busyId !== null}
                       className="text-xs text-pink-600 font-bold hover:text-pink-700 cursor-pointer bg-pink-50 px-3 py-1.5 rounded-lg transition-colors"
                     >
                       Set Default
@@ -145,6 +192,7 @@ const AddressTab: React.FC<AddressTabProps> = ({ profile }) => {
 
       {showModal && (
         <AddAddressModal
+          key={editingAddress?.id ?? 'new'}
           profile={profile}
           addressToEdit={editingAddress}
           onClose={() => setShowModal(false)}

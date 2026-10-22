@@ -18,7 +18,6 @@ export type Product = {
 // 2. Define the props
 interface FeaturedProductsProps {
   products: Product[];
-  onAddToCart?: (product: Product) => void;
   onLoadMore?: () => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
@@ -59,14 +58,13 @@ const FeaturedProducts: React.FC<FeaturedProductsProps> = ({
       { threshold: 0.1, rootMargin: '100px' }
     );
 
-    if (sentinelRef.current) {
-      observer.observe(sentinelRef.current);
+    const sentinel = sentinelRef.current;
+    if (sentinel) {
+      observer.observe(sentinel);
     }
 
     return () => {
-      if (sentinelRef.current) {
-        observer.unobserve(sentinelRef.current);
-      }
+      observer.disconnect();
     };
   }, [isInfiniteEnabled, hasMore, isLoadingMore, onLoadMore]);
 

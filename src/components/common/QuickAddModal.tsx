@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, ShoppingCart, Plus, Minus, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -35,11 +35,23 @@ const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [stock, setStock] = useState(0);
 
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear the pending auto-close timer if the modal unmounts first
+  useEffect(() => () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+  }, []);
+
   useEffect(() => {
     if (!productId) return;
+    let cancelled = false;
 
     const fetchVariants = async () => {
       setLoading(true);
+      // Reset per-product state so a previous product's variant/stock is never reused
+      setVariants([]);
+      setSelectedVariant(null);
+      setStock(0);
       try {
         const { data, error } = await supabase
           .from('products')
@@ -47,24 +59,30 @@ const QuickAddModal: React.FC<QuickAddModalProps> = ({
           .eq('id', productId)
           .single();
 
-        if (!error && data) {
-          const fetchedVariants = data.product_variants || [];
+        if (cancelled) return;
+        if (error) throw error;
+        if (data) {
+          const fetchedVariants: Variant[] = data.product_variants || [];
           setVariants(fetchedVariants);
           setStock(data.stock ?? 0);
-          if (fetchedVariants.length > 0) {
-            setSelectedVariant(fetchedVariants[0]);
-          }
+          // Default to the first variant that is actually in stock
+          setSelectedVariant(fetchedVariants.find((v) => v.stock > 0) ?? fetchedVariants[0] ?? null);
         }
       } catch (err) {
         console.error('Failed to load variants:', err);
+        if (!cancelled) setMessage({ text: 'Failed to load product options.', type: 'error' });
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    fetchVariants();
     setQuantity(1);
     setMessage(null);
+    fetchVariants();
+
+    return () => {
+      cancelled = true;
+    };
   }, [productId]);
 
   const currentPrice = selectedVariant ? selectedVariant.price : basePrice;
@@ -72,21 +90,24 @@ const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const isOutOfStock = maxStock <= 0;
 
   const handleAddToCart = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-
+    if (adding || !productId) return;
     setAdding(true);
+    setMessage(null);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        navigate('/login');
+        return;
+      }
+
       let cartId: string | null = null;
-      const { data: existingCart } = await supabase
+      const { data: existingCart, error: cartError } = await supabase
         .from('carts')
         .select('id')
         .eq('customer_id', user.id)
         .maybeSingle();
+      if (cartError) throw cartError;
 
       if (existingCart) {
         cartId = existingCart.id;
@@ -102,30 +123,44 @@ const QuickAddModal: React.FC<QuickAddModalProps> = ({
 
       if (!cartId) throw new Error('Could not initialize cart.');
 
-      const { data: existingItem } = await supabase
+      // `.eq(col, null)` never matches NULL rows in PostgREST — use `.is()` for products without variants
+      let itemQuery = supabase
         .from('cart_items')
         .select('id, quantity')
         .eq('cart_id', cartId)
-        .eq('product_id', productId)
-        .eq('variant_id', selectedVariant?.id ?? null)
-        .maybeSingle();
+        .eq('product_id', productId);
+      itemQuery = selectedVariant
+        ? itemQuery.eq('variant_id', selectedVariant.id)
+        : itemQuery.is('variant_id', null);
+      const { data: existingItem, error: itemError } = await itemQuery.maybeSingle();
+      if (itemError) throw itemError;
 
       if (existingItem) {
-        await supabase
+        // The bag already holds everything in stock — nothing more can be added
+        if (existingItem.quantity >= maxStock) {
+          setMessage({ text: 'You already have the maximum available in your bag.', type: 'error' });
+          return;
+        }
+        // Never merge beyond available stock
+        const newQuantity = Math.min(existingItem.quantity + quantity, maxStock);
+        const { error: updateError } = await supabase
           .from('cart_items')
-          .update({ quantity: existingItem.quantity + quantity })
+          .update({ quantity: newQuantity })
           .eq('id', existingItem.id);
+        if (updateError) throw updateError;
       } else {
-        await supabase.from('cart_items').insert({
+        const { error: insertError } = await supabase.from('cart_items').insert({
           cart_id: cartId,
           product_id: productId,
           quantity,
           variant_id: selectedVariant?.id ?? null,
         });
+        if (insertError) throw insertError;
       }
 
       setMessage({ text: 'Added to your bag! 🎉', type: 'success' });
-      setTimeout(() => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = setTimeout(() => {
         onClose();
       }, 1200);
     } catch (err) {

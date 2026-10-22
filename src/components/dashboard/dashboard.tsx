@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabaseClient';
@@ -20,7 +20,9 @@ import {
     Store,
     ChevronRight,
     Eye,
-    Edit
+    Edit,
+    AlertCircle,
+    RefreshCw
 } from 'lucide-react';
 
 interface ShopData {
@@ -43,46 +45,92 @@ const SellerDashboard: React.FC = () => {
     const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
     const [dashboardAction, setDashboardAction] = useState<string | null>(null);
     const [productCount, setProductCount] = useState(0);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     // Fetch product count for a given shop
-    const fetchProductCount = async (shopId: string) => {
-        const { count } = await supabase
+    const fetchProductCount = useCallback(async (shopId: string) => {
+        const { count, error } = await supabase
             .from('products')
             .select('*', { count: 'exact', head: true })
             .eq('shop_id', shopId);
+        if (error) {
+            console.error('Error fetching product count:', error);
+            return;
+        }
         setProductCount(count || 0);
-    };
+    }, []);
+
+    // Stable callbacks so ProductsTab's effects don't re-run on every dashboard render
+    const clearDashboardAction = useCallback(() => setDashboardAction(null), []);
+    const handleProductsChanged = useCallback(() => {
+        if (shop) fetchProductCount(shop.id);
+    }, [shop, fetchProductCount]);
+
+    const fetchShop = useCallback(async () => {
+        setLoading(true);
+        setLoadError(null);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) { navigate('/login'); return; }
+
+            const { data, error } = await supabase
+                .from('shops')
+                .select('id, name, description, business_phone, shop_logo_url, shop_banner_url, shop_address, is_vacation')
+                .eq('owner_id', session.user.id)
+                .maybeSingle();
+
+            if (error) throw error;
+            if (!data) {
+                // Genuinely no shop for this user
+                navigate('/profile', { state: { activeTab: 'shop' } });
+                return;
+            }
+            setShop(data);
+            fetchProductCount(data.id);
+        } catch (err) {
+            console.error(err);
+            setLoadError("We couldn't load your shop. Please check your connection and try again.");
+        } finally {
+            setLoading(false);
+        }
+    }, [navigate, fetchProductCount]);
 
     useEffect(() => {
-        const fetchShop = async () => {
-            try {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (!session) { navigate('/login'); return; }
-
-                const { data, error } = await supabase
-                    .from('shops')
-                    .select('id, name, description, business_phone, shop_logo_url, shop_banner_url, shop_address, is_vacation')
-                    .eq('owner_id', session.user.id)
-                    .single();
-
-                if (error || !data) {
-                    navigate('/profile', { state: { activeTab: 'shop' } });
-                    return;
-                }
-                setShop(data);
-                fetchProductCount(data.id);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchShop();
-    }, [navigate]);
+    }, [fetchShop]);
 
     if (loading) return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
             <Loader2 className="animate-spin text-pink-600" size={40} />
+        </div>
+    );
+
+    if (loadError) return (
+        <div className="min-h-screen bg-pink-50">
+            <Navbar />
+            <div className="flex items-center justify-center min-h-[calc(100vh-80px)] p-4">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-10 max-w-md w-full flex flex-col items-center text-center">
+                    <div className="w-14 h-14 rounded-xl bg-red-50 flex items-center justify-center text-red-500 mb-4">
+                        <AlertCircle size={28} />
+                    </div>
+                    <h2 className="text-lg font-bold text-gray-800">Something went wrong</h2>
+                    <p className="text-sm text-gray-500 mt-1">{loadError}</p>
+                    <div className="flex items-center gap-3 mt-6">
+                        <button
+                            onClick={() => navigate('/profile', { state: { activeTab: 'shop' } })}
+                            className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+                        >
+                            <ArrowLeft size={16} /> Back to Profile
+                        </button>
+                        <button
+                            onClick={fetchShop}
+                            className="flex items-center gap-2 bg-pink-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-pink-700 transition-all shadow-lg shadow-pink-200 cursor-pointer"
+                        >
+                            <RefreshCw size={16} /> Retry
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 
@@ -138,7 +186,7 @@ const SellerDashboard: React.FC = () => {
                         if (action) setDashboardAction(action);
                         setActiveTab(tab);
                     }} />}
-                    {activeTab === 'products' && shop && <ProductsTab shopId={shop.id} initialAction={dashboardAction} onClearAction={() => setDashboardAction(null)} />}
+                    {activeTab === 'products' && shop && <ProductsTab shopId={shop.id} initialAction={dashboardAction} onClearAction={clearDashboardAction} onProductsChanged={handleProductsChanged} />}
                     {activeTab === 'orders' && <PlaceholderTab icon={<ShoppingBag size={48} />} title="Orders" description="Incoming customer orders will appear here." />}
                     {activeTab === 'analytics' && <PlaceholderTab icon={<BarChart3 size={48} />} title="Analytics" description="Sales charts and performance metrics coming soon." />}
                     {activeTab === 'settings' && shop && <SettingsTab shop={shop} onShopUpdated={(updated) => setShop(updated)} />}
@@ -172,7 +220,7 @@ const OverviewTab = ({ shopName, shopId, productCount, onNavigate }: { shopName:
                 <h3 className="font-bold text-gray-800 mb-4">Quick Actions</h3>
                 <div className="space-y-3">
                     <QuickAction icon={<Plus size={18} />} label="Add New Product" description="List a product in your shop" onClick={() => onNavigate('products', 'add_product')} />
-                    <QuickAction icon={<Eye size={18} />} label="View My Shop" description="See how customers see it" onClick={() => { if (shopId) window.open(`/shop/${shopId}`, '_blank'); }} />
+                    <QuickAction icon={<Eye size={18} />} label="View My Shop" description="See how customers see it" onClick={() => { if (shopId) window.open(`${import.meta.env.BASE_URL}shop/${shopId}`, '_blank'); }} />
                     <QuickAction icon={<Edit size={18} />} label="Edit Shop Info" description="Update name, description, etc." onClick={() => onNavigate('settings')} />
                 </div>
             </div>

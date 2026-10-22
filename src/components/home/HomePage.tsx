@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabaseClient';
 import Navbar from '../common/Navbar';
@@ -10,128 +9,96 @@ import CategoryGrid from './CategoryGrid';
 import FeaturedProducts from './FeaturedProducts';
 import type { Product } from './FeaturedProducts';
 
+const PAGE_SIZE = 10;
+
+interface ProductRow {
+	id: string | number;
+	name: string;
+	description: string | null;
+	price: number | string;
+	image_urls: string[] | null;
+	average_rating?: number | null;
+	review_count?: number | null;
+}
+
+const fetchProductPage = async (start: number): Promise<Product[]> => {
+	const { data, error } = await supabase
+		.from('products')
+		.select('*')
+		.eq('is_active', true)
+		.order('created_at', { ascending: false })
+		.range(start, start + PAGE_SIZE - 1); // inclusive range
+
+	if (error) throw error;
+
+	return ((data ?? []) as ProductRow[]).map((p) => ({
+		id: p.id,
+		name: p.name,
+		desc: p.description ?? '',
+		price: Number(p.price),
+		image: p.image_urls?.[0] || '',
+		average_rating: p.average_rating ?? undefined,
+		review_count: p.review_count ?? undefined
+	}));
+};
+
 const HomePage: React.FC = () => {
-    const navigate = useNavigate();
 	const [products, setProducts] = useState<Product[]>([]);
-	const [_loading, setLoading] = useState(true);
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [hasMore, setHasMore] = useState(true);
 
-	const fetchProducts = async (isInitial = true) => {
-		if (isInitial) setLoading(true);
-		else setLoadingMore(true);
-
-		try {
-			const start = isInitial ? 0 : products.length;
-			const end = start + 9; // Fetch 10 products (inclusive)
-
-			const { data, error } = await supabase
-				.from('products')
-				.select('*')
-				.eq('is_active', true)
-				.order('created_at', { ascending: false })
-				.range(start, end);
-
-			if (error) throw error;
-
-			if (data) {
-				const mappedProducts = data.map((p: any) => ({
-					id: p.id,
-					name: p.name,
-					desc: p.description,
-					price: Number(p.price),
-					image: p.image_urls?.[0] || '',
-					average_rating: p.average_rating,
-					review_count: p.review_count
-				}));
-
-				if (isInitial) {
-					setProducts(mappedProducts);
-				} else {
-					setProducts(prev => [...prev, ...mappedProducts]);
-				}
-
-				// If we got fewer than 10 products, there are no more to fetch
-				if (data.length < 10) {
-					setHasMore(false);
-				}
-			}
-		} catch (err) {
-			console.error('Error fetching products:', err);
-		} finally {
-			if (isInitial) setLoading(false);
-			else setLoadingMore(false);
-		}
-	};
+	// Refs guard against duplicate "load more" requests and updates after unmount
+	const loadingMoreRef = useRef(false);
+	const productCountRef = useRef(0);
+	const mountedRef = useRef(true);
 
 	useEffect(() => {
-		fetchProducts(true);
+		productCountRef.current = products.length;
+	}, [products.length]);
+
+	useEffect(() => {
+		mountedRef.current = true;
+		let cancelled = false;
+
+		fetchProductPage(0)
+			.then((items) => {
+				if (cancelled) return;
+				setProducts(items);
+				// If we got fewer than a full page, there are no more to fetch
+				setHasMore(items.length === PAGE_SIZE);
+			})
+			.catch((err: unknown) => {
+				if (!cancelled) console.error('Error fetching products:', err);
+			});
+
+		return () => {
+			cancelled = true;
+			mountedRef.current = false;
+		};
 	}, []);
 
-	const handleLoadMore = () => {
-		if (!loadingMore && hasMore) {
-			fetchProducts(false);
-		}
-	};
-
-	const addToCart = async (p: Product) => {
-		const { data: { user } } = await supabase.auth.getUser();
-
-		if (!user) {
-			navigate('/login');
-			return;
-		}
+	const handleLoadMore = useCallback(async () => {
+		if (loadingMoreRef.current || !hasMore) return;
+		loadingMoreRef.current = true;
+		setLoadingMore(true);
 
 		try {
-			let cartId = null;
-			const { data: existingCart } = await supabase
-				.from('carts')
-				.select('id')
-				.eq('customer_id', user.id)
-				.maybeSingle();
+			const items = await fetchProductPage(productCountRef.current);
+			if (!mountedRef.current) return;
 
-			if (existingCart) {
-				cartId = existingCart.id;
-			} else {
-				const { data: newCart, error: newCartError } = await supabase
-					.from('carts')
-					.insert({ customer_id: user.id })
-					.select('id')
-					.single();
-
-				if (newCartError) throw newCartError;
-				cartId = newCart?.id;
-			}
-
-			if (!cartId) return;
-
-			const { data: existingItem } = await supabase
-				.from('cart_items')
-				.select('id, quantity')
-				.eq('cart_id', cartId)
-				.eq('product_id', p.id)
-				.is('variant_id', null)
-				.maybeSingle();
-
-			if (existingItem) {
-				await supabase
-					.from('cart_items')
-					.update({ quantity: existingItem.quantity + 1 })
-					.eq('id', existingItem.id);
-			} else {
-				await supabase
-					.from('cart_items')
-					.insert({
-						cart_id: cartId,
-						product_id: p.id,
-						quantity: 1,
-						variant_id: null
-					});
-			}
-		} catch (error) {
-			console.error("Error adding to cart from home:", error);
+			setProducts(prev => {
+				// Skip any rows already shown (offset pagination can shift if new products are added)
+				const seen = new Set(prev.map(p => p.id));
+				return [...prev, ...items.filter(p => !seen.has(p.id))];
+			});
+			if (items.length < PAGE_SIZE) setHasMore(false);
+		} catch (err: unknown) {
+			console.error('Error fetching products:', err);
+		} finally {
+			loadingMoreRef.current = false;
+			if (mountedRef.current) setLoadingMore(false);
 		}
-	};
+	}, [hasMore]);
 
 	return (
 		<motion.div
@@ -147,10 +114,9 @@ const HomePage: React.FC = () => {
 				<HeroCarousel />
 				<PromoCarousel />
 				<CategoryGrid />
-				<FlashSale products={products.slice(0, 10)} onAddToCart={addToCart} />
+				<FlashSale products={products.slice(0, 10)} />
 				<FeaturedProducts
 					products={products}
-					onAddToCart={addToCart}
 					onLoadMore={handleLoadMore}
 					hasMore={hasMore}
 					isLoadingMore={loadingMore}

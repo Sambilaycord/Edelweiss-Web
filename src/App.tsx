@@ -1,83 +1,96 @@
-import { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { createBrowserRouter, RouterProvider, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
+import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabaseClient';
+import { isRecoverySession } from './lib/passwordRecovery';
+import { startPresence, stopPresence } from './lib/presence';
 
-import LoginPage from "./components/login/LoginPage";
-import HomePage from "./components/home/HomePage";
-import PasswordReset from "./components/login/PasswordReset";
-import ProfilePage from "./components/profile/ProfilePage";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
-import SellerRegistration from './components/profile/SellerRegistration';
-import CartPage from './components/cart/CartPage';
-import CheckoutPage from './components/checkout/CheckoutPage';
-import SellerDashboard from './components/dashboard/dashboard';
-import ShopPage from './components/shop/ShopPage';
-import ProductPage from './components/product/ProductPage';
-import NotificationPage from './components/notification/NotificationPage';
 import Footer from './components/common/Footer';
 import ScrollToTop from './components/common/ScrollToTop';
 
-function App() {
-  const [session, setSession] = useState<any>(null);
+// Pages are loaded on demand so the first visit only downloads what it needs
+const LoginPage = lazy(() => import('./components/login/LoginPage'));
+const HomePage = lazy(() => import('./components/home/HomePage'));
+const PasswordReset = lazy(() => import('./components/login/PasswordReset'));
+const ProfilePage = lazy(() => import('./components/profile/ProfilePage'));
+const SellerRegistration = lazy(() => import('./components/profile/SellerRegistration'));
+const CartPage = lazy(() => import('./components/cart/CartPage'));
+const CheckoutPage = lazy(() => import('./components/checkout/CheckoutPage'));
+const SellerDashboard = lazy(() => import('./components/dashboard/dashboard'));
+const ShopPage = lazy(() => import('./components/shop/ShopPage'));
+const ProductPage = lazy(() => import('./components/product/ProductPage'));
+const NotificationPage = lazy(() => import('./components/notification/NotificationPage'));
+const SearchPage = lazy(() => import('./components/search/SearchPage'));
+
+interface RedirectState {
+  from?: { pathname: string; search?: string; hash?: string };
+}
+
+// Redirects already-authenticated users away from guest-only pages (login),
+// sending them back to the page ProtectedRoute bounced them from, if any.
+function GuestOnly({ session, children }: { session: Session | null; children: ReactNode }) {
+  const location = useLocation();
+  if (!session) return <>{children}</>;
+  const from = (location.state as RedirectState | null)?.from;
+  const to = from ? `${from.pathname}${from.search ?? ''}${from.hash ?? ''}` : '/';
+  return <Navigate to={to} replace />;
+}
+
+function AppLayout() {
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let presenceChannel: any = null;
+    let cancelled = false;
 
-    const setupPresence = async (userId: string) => {
-      if (presenceChannel) return;
-      presenceChannel = supabase.channel('global_presence');
-      presenceChannel
-        .on('presence', { event: 'sync' }, () => { })
-        .subscribe(async (status: string) => {
-          if (status === 'SUBSCRIBED') {
-            await presenceChannel.track({ user_id: userId, online_at: new Date().toISOString() });
-          }
-        });
-    };
+    const init = async () => {
+      const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+      if (error) console.error('Failed to load session:', error);
+      let current = initialSession;
 
-    const teardownPresence = async () => {
-      if (presenceChannel) {
-        await supabase.removeChannel(presenceChannel);
-        presenceChannel = null;
+      // A leftover password-recovery session (abandoned reset, or a recovery link) must not
+      // act as a login — the user has to finish setting a new password first.
+      if (isRecoverySession(current)) {
+        await supabase.auth.signOut({ scope: 'local' });
+        current = null;
       }
-    };
 
-    // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+      if (cancelled) return;
+      setSession(current);
       setLoading(false);
-      if (session?.user) {
-        setupPresence(session.user.id);
-      }
-    });
+      startPresence(current?.user?.id ?? null);
+    };
+    init();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session?.user) {
-        setupPresence(session.user.id);
-      } else {
-        teardownPresence();
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, authSession) => {
+      if (cancelled) return;
+      // PasswordReset briefly holds a recovery session while it changes the password; never treat it as logged in.
+      const newSession = isRecoverySession(authSession) ? null : authSession;
+      setSession(newSession);
+      startPresence(newSession?.user?.id ?? null);
     });
 
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
-      teardownPresence();
+      stopPresence();
     };
   }, []);
 
   if (loading) return null;
 
   return (
-    <Router>
+    <>
       <ScrollToTop />
       <div className="flex flex-col min-h-screen">
         <main className="flex-grow">
           <AnimatePresence mode="wait">
+            <Suspense fallback={null}>
             <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/search" element={<SearchPage />} />
           <Route path="/shop/:shopId" element={<ShopPage />} />
           <Route path="/product/:productId" element={<ProductPage />} />
           <Route path="/cart" element={<CartPage />} />
@@ -91,7 +104,11 @@ function App() {
           />
           <Route
             path="/login"
-            element={session ? <Navigate to="/" replace /> : <LoginPage />}
+            element={
+              <GuestOnly session={session}>
+                <LoginPage />
+              </GuestOnly>
+            }
           />
           <Route
             path="/password-reset"
@@ -131,12 +148,23 @@ function App() {
           />
           <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            </Suspense>
           </AnimatePresence>
         </main>
         <Footer />
       </div>
-    </Router>
+    </>
   );
+}
+
+// A data router is required for useBlocker (used by PasswordReset).
+const router = createBrowserRouter(
+  [{ path: '*', element: <AppLayout /> }],
+  { basename: import.meta.env.BASE_URL }
+);
+
+function App() {
+  return <RouterProvider router={router} />;
 }
 
 export default App;

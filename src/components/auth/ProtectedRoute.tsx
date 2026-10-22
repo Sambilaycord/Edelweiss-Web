@@ -12,19 +12,34 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const location = useLocation();
 
   useEffect(() => {
+    let cancelled = false;
+
     const checkAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setAuthenticated(!!session);
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (!cancelled) setAuthenticated(!!session);
       } catch (error) {
         console.error("Auth check failed:", error);
-        setAuthenticated(false);
+        if (!cancelled) setAuthenticated(false);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     checkAuth();
+
+    // Keep in sync so signing out (or session expiry) on a protected page redirects to login
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (cancelled) return;
+      setAuthenticated(!!session);
+      setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   if (loading) {

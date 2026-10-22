@@ -6,6 +6,8 @@ import 'react-phone-number-input/style.css'
 import '../../styles/index.css';
 
 interface ProfileData {
+  username: string | null;
+  avatar_url: string | null;
   first_name: string | null;
   last_name: string | null;
   phone_number: string | null;
@@ -16,7 +18,7 @@ interface ProfileData {
 
 interface PersonalInfoTabProps {
   profile: ProfileData;
-  setProfile: React.Dispatch<React.SetStateAction<any>>;
+  setProfile: React.Dispatch<React.SetStateAction<ProfileData>>;
   onSave: (e: React.FormEvent) => Promise<void>;
   updating: boolean;
   message: { text: string; type: 'success' | 'error' } | null;
@@ -50,7 +52,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
             type="text"
             value={profile.first_name || ''}
             maxLength={50}
-            onChange={(e) => setProfile({ ...profile, first_name: e.target.value })}
+            onChange={(e) => setProfile(prev => ({ ...prev, first_name: e.target.value }))}
             placeholder="Enter First Name"
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-pink-500 outline-none transition-shadow"
           />
@@ -62,7 +64,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
             type="text"
             value={profile.last_name || ''}
             maxLength={50}
-            onChange={(e) => setProfile({ ...profile, last_name: e.target.value })}
+            onChange={(e) => setProfile(prev => ({ ...prev, last_name: e.target.value }))}
             placeholder="Enter Last Name"
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-pink-500 outline-none transition-shadow"
           />
@@ -88,7 +90,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
             defaultCountry="PH"
             limitMaxLength={true}
             value={profile.phone_number || ''}
-            onChange={(val) => setProfile({ ...profile, phone_number: val })}
+            onChange={(val) => setProfile(prev => ({ ...prev, phone_number: val ?? null }))}
             className="flex w-full border border-gray-300 rounded-lg px-4 py-2 focus-within:ring-2 focus-within:ring-pink-500 outline-none transition-shadow"
           />
         </div>
@@ -105,7 +107,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
                     name="gender"
                     value={option}
                     checked={profile.gender === option}
-                    onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
+                    onChange={(e) => setProfile(prev => ({ ...prev, gender: e.target.value }))}
                     className="peer appearance-none w-5 h-5 border-2 border-gray-300 rounded-full checked:border-pink-500 transition-all cursor-pointer"
                   />
                   <div className="absolute w-2.5 h-2.5 bg-pink-500 rounded-full opacity-0 peer-checked:opacity-100 transition-opacity" />
@@ -124,7 +126,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
           <input
             type="date"
             value={profile.birthdate || ''}
-            onChange={(e) => setProfile({ ...profile, birthdate: e.target.value })}
+            onChange={(e) => setProfile(prev => ({ ...prev, birthdate: e.target.value }))}
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-pink-500 outline-none"
           />
         </div>

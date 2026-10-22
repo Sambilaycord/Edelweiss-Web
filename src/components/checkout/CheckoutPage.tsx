@@ -4,16 +4,72 @@ import { supabase } from '../../lib/supabaseClient';
 import { MapPin, CreditCard, ChevronDown, ChevronUp, Loader2, ArrowLeft, CheckCircle2, ChevronRight, Plus, Mail, MessageSquare, X } from 'lucide-react';
 import Navbar from '../common/Navbar';
 
+interface CheckoutItem {
+  id: string;
+  quantity: number;
+  products: {
+    name: string;
+    price: number;
+    image_urls?: string[] | null;
+    image_url?: string | null;
+  } | null;
+  product_variants: {
+    name: string;
+    price: number;
+  } | null;
+}
+
+interface Address {
+  id: string;
+  receiver_name: string;
+  phone_number: string;
+  detailed_address: string;
+  barangay: string;
+  city_municipality: string;
+  province: string;
+  is_default: boolean;
+}
+
+interface CheckoutState {
+  items?: CheckoutItem[];
+  discount?: number;
+  promoCode?: string;
+}
+
+interface RpcError {
+  code?: string;
+  message?: string;
+}
+
+// Turns a failed place_order RPC into a message the shopper can act on
+const getPlaceOrderErrorMessage = (error: RpcError): string => {
+  if (error.code === 'PGRST202') {
+    return "Checkout isn't set up yet: run the SQL migration (supabase/migrations/20261022000000_checkout_and_role_guard.sql) in the Supabase SQL editor.";
+  }
+  // Messages raised by place_order itself (stock, address, promo code, ...) are written for the user
+  if (error.code === 'P0001' && error.message) return error.message;
+  if (error.code === '28000') return 'Your session has expired. Please sign in again.';
+  return error.message ? `Could not place your order: ${error.message}` : 'Could not place your order. Please try again.';
+};
+
+const EMPTY_ITEMS: CheckoutItem[] = [];
+
 const CheckoutPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const dropdownRef = useRef<HTMLDivElement>(null);
+  // Synchronous double-submit guard (state updates are async, so a fast double click could slip through)
+  const placingOrderRef = useRef(false);
+  const mountedRef = useRef(true);
 
-  const { items = [], discount: initialDiscount = 0 } = location.state || {};
+  const checkoutState = (location.state as CheckoutState | null) || {};
+  const items = checkoutState.items ?? EMPTY_ITEMS;
+  const initialDiscount = checkoutState.discount ?? 0;
+  const initialPromoCode = initialDiscount > 0 ? (checkoutState.promoCode ?? '') : '';
 
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [addresses, setAddresses] = useState<any[]>([]);
+  const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [showAllAddresses, setShowAllAddresses] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cod');
@@ -23,14 +79,52 @@ const CheckoutPage: React.FC = () => {
   const [messageType, setMessageType] = useState<'free' | 'envelope'>('free');
   const [personalMessage, setPersonalMessage] = useState('');
 
-  const [promoCode, setPromoCode] = useState('');
-  const [appliedDiscount, setAppliedDiscount] = useState(initialDiscount);
+  const [promoCode, setPromoCode] = useState(initialPromoCode);
+  const [appliedPromoCode, setAppliedPromoCode] = useState(initialPromoCode);
+  const [appliedDiscount, setAppliedDiscount] = useState(initialPromoCode ? initialDiscount : 0);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const [promoMessage, setPromoMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
 
+  const hasItems = items.length > 0;
+
+  // Redirect back to the cart if there's nothing to check out
   useEffect(() => {
-    if (items.length === 0) { navigate('/cart'); return; }
+    if (!hasItems) navigate('/cart', { replace: true });
+  }, [hasItems, navigate]);
+
+  useEffect(() => {
+    if (!hasItems) return;
+    let cancelled = false;
+
+    const fetchAllAddresses = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
+
+        const { data, error } = await supabase
+          .from('addresses')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('is_default', { ascending: false });
+        if (error) throw error;
+        if (cancelled) return;
+
+        const list = (data as Address[] | null) || [];
+        setAddresses(list);
+        const defaultAddr = list.find(a => a.is_default) || list[0];
+        if (defaultAddr) setSelectedAddressId(defaultAddr.id);
+      } catch (err) {
+        console.error('Error fetching addresses:', err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
     fetchAllAddresses();
 
+    return () => { cancelled = true; };
+  }, [hasItems]);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowAllAddresses(false);
@@ -38,38 +132,32 @@ const CheckoutPage: React.FC = () => {
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [items, navigate]);
+  }, []);
 
-  const fetchAllAddresses = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase
-        .from('addresses')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('is_default', { ascending: false });
-
-      setAddresses(data || []);
-      const defaultAddr = data?.find(a => a.is_default) || data?.[0];
-      if (defaultAddr) setSelectedAddressId(defaultAddr.id);
-    }
-    setLoading(false);
-  };
+  // Track mount state so a slow place_order response doesn't update an unmounted page
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const activeAddress = addresses.find(a => a.id === selectedAddressId);
   const otherAddresses = addresses.filter(a => a.id !== selectedAddressId);
 
   const handleApplyPromo = () => {
-    if (promoCode.toUpperCase() === 'EDELWEISS2026') {
+    // Client-side preview only; place_order re-validates the code on the server
+    const code = promoCode.trim().toUpperCase();
+    if (code === 'EDELWEISS2026') {
       setAppliedDiscount(100);
+      setAppliedPromoCode(code);
       setPromoMessage({ text: 'Promo code applied!', type: 'success' });
     } else {
       setAppliedDiscount(0);
+      setAppliedPromoCode('');
       setPromoMessage({ text: 'Invalid promo code', type: 'error' });
     }
   };
 
-  const subtotal = items.reduce((acc: number, item: any) => {
+  const subtotal = items.reduce((acc: number, item) => {
     const itemPrice = item.product_variants?.price ?? item.products?.price ?? 0;
     return acc + (itemPrice * item.quantity);
   }, 0);
@@ -80,11 +168,37 @@ const CheckoutPage: React.FC = () => {
   const total = Math.max(0, subtotal + shipping + addonFee - appliedDiscount);
 
   const handlePlaceOrder = async () => {
+    // Guard against double-submits while the order is being placed
+    if (placingOrderRef.current || processing || !selectedAddressId) return;
+    placingOrderRef.current = true;
     setProcessing(true);
-    setTimeout(() => {
-      setProcessing(false);
-      navigate('/profile', { state: { confetti: true } });
-    }, 2000);
+    setOrderError(null);
+
+    try {
+      // Prices, stock, promo and shipping are all recomputed server-side
+      const { error } = await supabase.rpc('place_order', {
+        p_cart_item_ids: items.map(item => item.id),
+        p_address_id: selectedAddressId,
+        p_payment_method: paymentMethod,
+        p_promo_code: appliedPromoCode || null,
+        p_message: showMessageOptions ? personalMessage.trim() || null : null,
+        p_message_type: showMessageOptions ? messageType : null,
+      });
+
+      if (error) {
+        console.error('Error placing order:', error);
+        if (mountedRef.current) setOrderError(getPlaceOrderErrorMessage(error));
+        return;
+      }
+
+      if (mountedRef.current) navigate('/profile', { state: { confetti: true } });
+    } catch (err) {
+      console.error('Error placing order:', err);
+      if (mountedRef.current) setOrderError('Could not place your order. Please check your connection and try again.');
+    } finally {
+      placingOrderRef.current = false;
+      if (mountedRef.current) setProcessing(false);
+    }
   };
 
   if (loading) return (
@@ -178,13 +292,13 @@ const CheckoutPage: React.FC = () => {
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
               <h2 className="text-xl font-bold text-gray-800 mb-6">Order Items</h2>
               <div className="divide-y divide-gray-50">
-                {items.map((item: any) => {
+                {items.map((item) => {
                   const itemPrice = item.product_variants?.price ?? item.products?.price ?? 0;
                   return (
                     <div key={item.id} className="flex gap-4 py-4 first:pt-0 last:pb-0 items-center">
-                      <img src={item.products.image_urls?.[0] || item.products.image_url} className="w-20 h-20 object-cover rounded-xl border border-gray-100" alt={item.products.name} />
+                      <img src={item.products?.image_urls?.[0] || item.products?.image_url || undefined} className="w-20 h-20 object-cover rounded-xl border border-gray-100" alt={item.products?.name} />
                       <div className="flex-1 text-left">
-                        <h4 className="font-bold text-gray-800 text-base">{item.products.name}</h4>
+                        <h4 className="font-bold text-gray-800 text-base">{item.products?.name}</h4>
                         <p className="text-gray-400 text-[12px] mt-1 font-semibold mb-1">Variant: {item.product_variants?.name || "Default"}</p>
                         <p className="text-gray-400 text-[12px] font-semibold">Quantity: {item.quantity}</p>
                       </div>
@@ -332,6 +446,9 @@ const CheckoutPage: React.FC = () => {
                 >
                   {processing ? <Loader2 className="animate-spin" /> : "Place Order"}
                 </button>
+                {orderError && (
+                  <p role="alert" className="text-xs mt-3 font-bold text-red-500 text-center">{orderError}</p>
+                )}
               </div>
             </div>
           </div>
@@ -341,7 +458,14 @@ const CheckoutPage: React.FC = () => {
   );
 };
 
-const PaymentOption = ({ label, active, onClick }: any) => (
+interface PaymentOptionProps {
+  id: string;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}
+
+const PaymentOption = ({ label, active, onClick }: PaymentOptionProps) => (
   <button onClick={onClick} className={`w-full p-4 border-2 rounded-2xl text-left transition-all cursor-pointer group ${active ? 'border-pink-500 bg-pink-50' : 'border-gray-100 text-gray-500 hover:border-pink-100'}`}>
     <div className="flex justify-between items-center">
       <span className={`font-bold text-sm ${active ? 'text-pink-600' : 'text-gray-600'}`}>{label}</span>

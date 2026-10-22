@@ -9,51 +9,67 @@ interface ReminderItem {
   name: string;
   reminder_date: string;
   daysRemaining: number;
+  isNextYear: boolean;
   message: string;
   icon_name?: string;
-  product_id?: string;
+  product_id?: string | null;
   products?: {
     id: string;
     name: string;
-    image_urls: string[];
+    image_urls: string[] | null;
     price: number;
-  };
+  } | null;
 }
+
+type ReminderRow = Omit<ReminderItem, 'daysRemaining' | 'message' | 'isNextYear'>;
+
+// Parse a YYYY-MM-DD (or ISO timestamp) as a *local* calendar date.
+// `new Date('YYYY-MM-DD')` is parsed as UTC midnight, which shifts the day in many timezones.
+const parseLocalDate = (value: string) => {
+  const [y, m, d] = value.split('T')[0].split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+};
+
+// Build a date in `year`, clamping the day to the month's length so Feb 29
+// becomes Feb 28 in non-leap years instead of rolling over to Mar 1
+const dateInYear = (year: number, month: number, day: number) => {
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return new Date(year, month, Math.min(day, lastDay));
+};
+
+const getNextOccurrence = (targetDate: string) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const original = parseLocalDate(targetDate);
+
+  // Handle anniversary/birthday recurrence by setting year to current or next
+  let eventDate = dateInYear(today.getFullYear(), original.getMonth(), original.getDate());
+  if (eventDate < today) {
+    eventDate = dateInYear(today.getFullYear() + 1, original.getMonth(), original.getDate());
+  }
+
+  // Math.round guards against DST shifts making a day 23/25 hours long
+  const days = Math.round((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  return { days, isNextYear: eventDate.getFullYear() > today.getFullYear() };
+};
+
+const getCustomMessage = (days: number, name: string) => {
+  if (days === 0) return `It's ${name} today! Time to celebrate! 🎉`;
+  if (days === 1) return `${name} is tomorrow! Are you ready? ✨`;
+  if (days <= 7) return `${name} is just ${days} days away! Time to find the perfect gift. ❤️`;
+  return `${name} is coming up in ${days} days. Don't forget to send some love! 🎁`;
+};
 
 const RemindersTab: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [reminders, setReminders] = useState<ReminderItem[]>([]);
 
-  const calculateDaysRemaining = (targetDate: string) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const eventDate = new Date(targetDate);
-    eventDate.setHours(0, 0, 0, 0);
-
-    // Handle anniversary/birthday recurrence by setting year to current or next
-    const currentYear = today.getFullYear();
-    eventDate.setFullYear(currentYear);
-
-    if (eventDate < today) {
-      eventDate.setFullYear(currentYear + 1);
-    }
-
-    const diffTime = eventDate.getTime() - today.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
-
-  const getCustomMessage = (days: number, name: string) => {
-    if (days === 0) return `It's ${name} today! Time to celebrate! 🎉`;
-    if (days === 1) return `${name} is tomorrow! Are you ready? ✨`;
-    if (days <= 7) return `${name} is just ${days} days away! Time to find the perfect gift. ❤️`;
-    return `${name} is coming up in ${days} days. Don't forget to send some love! 🎁`;
-  };
-
   useEffect(() => {
+    let cancelled = false;
+
     const fetchReminders = async () => {
       try {
-        setLoading(true);
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
@@ -64,12 +80,13 @@ const RemindersTab: React.FC = () => {
 
         if (error) throw error;
 
-        if (data) {
-          const processed = data.map((r: any) => {
-            const days = calculateDaysRemaining(r.reminder_date);
+        if (data && !cancelled) {
+          const processed: ReminderItem[] = (data as ReminderRow[]).map((r) => {
+            const { days, isNextYear } = getNextOccurrence(r.reminder_date);
             return {
               ...r,
               daysRemaining: days,
+              isNextYear,
               message: getCustomMessage(days, r.name)
             };
           }).sort((a, b) => a.daysRemaining - b.daysRemaining);
@@ -79,11 +96,12 @@ const RemindersTab: React.FC = () => {
       } catch (err) {
         console.error('Error fetching feed reminders:', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchReminders();
+    return () => { cancelled = true; };
   }, []);
 
   const renderIcon = (name: string | undefined, isToday: boolean) => {
@@ -94,9 +112,14 @@ const RemindersTab: React.FC = () => {
       case 'flower': return <Flower size={size} className={className} />;
       case 'heart': return <Heart size={size} className={className} />;
       case 'cake': return <Cake size={size} className={className} />;
+      // AddReminderModal saves snake_case names (party_popper, sparkles, graduation_cap);
+      // keep the legacy spellings for rows saved before that.
+      case 'party_popper':
       case 'party-popper': return <PartyPopper size={size} className={className} />;
       case 'gift': return <Gift size={size} className={className} />;
+      case 'sparkles':
       case 'sparkle': return <Sparkles size={size} className={className} />;
+      case 'graduation_cap':
       case 'graduation-cap': return <GraduationCap size={size} className={className} />;
       case 'truck': return <Truck size={size} className={className} />;
       default: return <Flower size={size} className={className} />;
@@ -137,23 +160,11 @@ const RemindersTab: React.FC = () => {
         <div className="space-y-10">
           {['Today', 'Coming Up', 'Later', 'Next Year'].map((section) => {
             const filtered = reminders.filter(r => {
-              const today = new Date();
-              const eventDate = new Date(r.reminder_date);
-              
-              let targetYear = today.getFullYear();
-              const eventThisYear = new Date(eventDate);
-              eventThisYear.setFullYear(targetYear);
-              
-              if (eventThisYear < today && today.toDateString() !== eventThisYear.toDateString()) {
-                targetYear++;
-              }
-              
-              const isNextYear = targetYear > today.getFullYear();
-
               if (section === 'Today') return r.daysRemaining === 0;
               if (section === 'Coming Up') return r.daysRemaining > 0 && r.daysRemaining <= 7;
-              if (section === 'Later') return r.daysRemaining > 7 && !isNextYear;
-              if (section === 'Next Year') return isNextYear;
+              if (section === 'Later') return r.daysRemaining > 7 && !r.isNextYear;
+              // Only reminders past the "Coming Up" window, so nothing is listed twice
+              if (section === 'Next Year') return r.daysRemaining > 7 && r.isNextYear;
               return false;
             });
 
@@ -185,7 +196,7 @@ const RemindersTab: React.FC = () => {
                           </h4>
                           <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider shrink-0 ${reminder.daysRemaining === 0 ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-400'
                             }`}>
-                            {new Date(reminder.reminder_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {parseLocalDate(reminder.reminder_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                           </span>
                         </div>
                         <p className="text-gray-500 text-sm leading-relaxed pr-10 line-clamp-2 font-medium">
